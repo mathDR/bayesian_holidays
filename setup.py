@@ -1,7 +1,5 @@
 from setuptools import setup, find_packages
 
-package = "bayesian_holidays"
-
 install_requires = [
     "numpy",
     "pandas",
@@ -12,7 +10,7 @@ install_requires = [
 ]
 
 setup(
-    name=package,
+    name="bayesian_holidays",
     author="Daniel Marthaler",
     author_email="dan.marthaler@gmail.com",
     description="Bayesian Holiday Model for Time Series",
