@@ -5,7 +5,8 @@ package = "bayesian_holidays"
 install_requires = [
     "numpy",
     "pandas",
-    "matplotlib" "cmdstanpy",
+    "matplotlib",
+    "cmdstanpy",
     "holidays",
     "pytrends",
 ]
