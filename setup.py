@@ -1,5 +1,4 @@
 from setuptools import setup, find_packages
-from gator import __version__
 
 package = "bayesian_holidays"
 
