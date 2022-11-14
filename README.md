@@ -1,49 +1,6 @@
 # bayesian_holidays
 A Bayesian Holiday Time Series Model
 
-
----
-title: "Tis the Season...to be Bayesian!"
-date: 2020-12-16 09:00:00 -7000
-layout: post
-linkedinimage: ""
-facebookimage: ""
-twitterimage: ""
-author:
-- Daniel Marthaler
-graphics:
-- Brian Coffey
-published: true
-location: "San Francisco, CA"
-excerpt: <p>Bayesian Holiday Modeling for Time Series Inference</p>
-tags:
-  - algorithms
----
-
-<style>
-
-@font-face {
-  font-family: 'brandontext-svg-bold';
-  src: url('/assets/posts/2020-06-02-large-scale-experimentation/fonts/brandontext-svg/31E0E1_0_0.eot');
-  src: url('/assets/posts/2020-06-02-large-scale-experimentation/fonts/brandontext-svg/31E0E1_0_0.eot?#iefix') format('embedded-opentype'),
-     url('/assets/posts/2020-06-02-large-scale-experimentation/fonts/brandontext-svg/31E0E1_0_0.woff') format('woff'),
-     url('/assets/posts/2020-06-02-large-scale-experimentation/brandontext-svg/31E0E1_0_0.ttf') format('truetype'),
-     url('/assets/posts/2020-06-02-large-scale-experimentation/brandontext-svg/31E0E1_0_0.svg') format('svg');
-  font-weight: normal;
-}
-
-@font-face {
-  font-family: 'brandontext-svg-regular';
-  src: url('/assets/posts/2020-06-02-large-scale-experimentation/fonts/brandontext-svg/31E0E1_2_0.eot');
-  src: url('/assets/posts/2020-06-02-large-scale-experimentation/fonts/brandontext-svg/31E0E1_2_0.eot?#iefix') format('embedded-opentype'),
-     url('/assets/posts/2020-06-02-large-scale-experimentation/fonts/brandontext-svg/31E0E1_2_0.woff') format('woff'),
-     url('/assets/posts/2020-06-02-large-scale-experimentation/brandontext-svg/31E0E1_2_0.ttf') format('truetype'),
-     url('/assets/posts/2020-06-02-large-scale-experimentation/brandontext-svg/31E0E1_2_0.svg') format('svg');
-  font-weight: normal;
-}
-
-</style>
-
 As Mark Twain may have said:  “Prediction is very difficult, especially about the future” [[1](#1)].  Alas, at Stitch Fix we do this all the time. Specifically, we need to predict upcoming demand for our inventory. This allows us to determine which clothes to stock, so we can order the correct number of units for each item, and to allocate those units to the right warehouses, allowing us to deliver delightful fixes for our clients!
 
 As the year unfolds, our demand fluctuates. Two big drivers of that fluctuation are seasonality and holidays. With the holiday season upon us, it's a great time to describe how both seasonality and holiday effects can be estimated, and how you can use this formulation in a predictive time series model.
@@ -91,17 +48,17 @@ If there are $$H$$ holidays considered in the model, then each observation has $
 Generating a model that encompasses all of the criteria we outlined above involves combining a lot of ingredients.
 
 Our holiday effect function $$h(t)$$ describes the effect of the holiday at date $$t$$ as:  
-<div align="center">
+
 $$
 h(t) = 2 \lambda \frac{\exp\left(-|z(t)|^\omega\right)}{1+\exp\left(-\kappa z(t)\right)}
 $$
-</div>
+
 with
-<div align="center">
+
 $$
 z(t) = \frac{t - \mu}{\sigma} 
 $$
-</div>
+
 
 where
 + $$\mu$$ is the location parameter - it denotes how “offset” the effect is from the actual holiday date
@@ -110,124 +67,7 @@ where
 + $$\kappa$$ is the skew parameter - it denotes how asymmetrical the holiday effect is around $$\mu$$
 + $$\lambda$$ is the intensity parameter - this denotes the magnitude of the holiday effect.
 
-To get a feel for the types of effects able to be modeled, play with the sliders below to generate possible ranges from the Holiday Effect Function.
-
-
-<svg viewBox="0 0 684 234" enable-background="new 0 0 684 234" xml:space="preserve" style="padding-bottom:30px;padding-top:10px">
-<g id="static">
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="242.8" y1="27.7" x2="27.5" y2="27.7"/>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="242.8" y1="135.6" x2="27.5" y2="135.6"/>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="242.8" y1="171.5" x2="27.5" y2="171.5"/>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="63.5" y1="9" x2="63.5" y2="189"/>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="170.8" y1="9" x2="170.8" y2="189"/>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="206.8" y1="9" x2="206.8" y2="189"/>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="242.8" y1="9" x2="242.8" y2="189"/>
-    <text transform="matrix(1 0 0 1 11.7402 31)" font-family="'brandontext-svg-regular'" font-size="10px">4</text>
-    <text transform="matrix(1 0 0 1 12.4702 67)" font-family="'brandontext-svg-regular'" font-size="10px">2</text>
-    <text transform="matrix(1 0 0 1 11.5801 103)" font-family="'brandontext-svg-regular'" font-size="10px">0</text>
-    <text transform="matrix(1 0 0 1 8.6401 139)" font-family="'brandontext-svg-regular'" font-size="10px">-2</text>
-    <text transform="matrix(1 0 0 1 7.9102 175)" font-family="'brandontext-svg-regular'" font-size="10px">-4</text>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="242.8" y1="8.5" x2="27.5" y2="8.5"/>
-    <text transform="matrix(1 0 0 1 19.1099 207)" font-family="'brandontext-svg-regular'" font-size="10px">-20</text>
-    <text transform="matrix(1 0 0 1 56.1899 207)" font-family="'brandontext-svg-regular'" font-size="10px">-10</text>
-    <text transform="matrix(1 0 0 1 95.79 207)" font-family="'brandontext-svg-regular'" font-size="10px">0</text>
-    <text transform="matrix(1 0 0 1 130.105 207)" font-family="'brandontext-svg-regular'" font-size="10px">10</text>
-    <text transform="matrix(1 0 0 1 165.0249 207)" font-family="'brandontext-svg-regular'" font-size="10px">20</text>
-    <text transform="matrix(1 0 0 1 200.9751 207)" font-family="'brandontext-svg-regular'" font-size="10px">30</text>
-    <text transform="matrix(1 0 0 1 236.6602 207)" font-family="'brandontext-svg-regular'" font-size="10px">40</text>
-
-    <text transform="matrix(1 0 0 1 441 31)" font-family="'brandontext-svg-regular'" font-size="12px">Skew (&#954;)</text>
-
-    <text transform="matrix(1 0 0 1 441 67)" font-family="'brandontext-svg-regular'" font-size="12px">Shape (&#969;)</text>
-
-    <text transform="matrix(1 0 0 1 441 103)" font-family="'brandontext-svg-regular'" font-size="12px">Scale (&#963;)</text>
-
-    <text transform="matrix(1 0 0 1 441 139)" font-family="'brandontext-svg-regular'" font-size="12px">Loc (&#956;)</text>
-
-    <text transform="matrix(1 0 0 1 441 175)" font-family="'brandontext-svg-regular'" font-size="12px">Intensity (&#955;)</text>
-
-    <text transform="matrix(1 0 0 1 596.5986 54)" font-family="'brandontext-svg-regular'" font-size="12px">Examples</text>
-    <text transform="matrix(1 0 0 1 23.2217 225)" font-family="'brandontext-svg-regular'" font-size="12px">number of days away from the holiday date</text>
-</g>
-<g id="y-0">
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="242.8" y1="99.6" x2="27.5" y2="99.6"/>
-</g>
-<g id="y-2">
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="242.8" y1="63.7" x2="27.5" y2="63.7"/>
-</g>
-<g id="x-0">
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="99.4" y1="9" x2="99.4" y2="189"/>
-</g>
-<g id="x-10">
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="135.4" y1="9" x2="135.4" y2="189"/>
-</g>
-<g id="axes">
-    <line fill="none" stroke="#000000" stroke-miterlimit="10" x1="27.5" y1="9" x2="27.5" y2="189"/>
-    <line fill="none" stroke="#000000" stroke-miterlimit="10" x1="242.8" y1="189.5" x2="27.5" y2="189.5"/>
-</g>
-<g id="slider-lines">
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="279" y1="27" x2="387" y2="27"/>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="279" y1="63" x2="387" y2="63"/>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="279" y1="99" x2="387" y2="99"/>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="279" y1="135" x2="387" y2="135"/>
-    <line fill="none" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" x1="279" y1="171" x2="387" y2="171"/>
-</g>
-<g id="slider-skew">
-    <circle fill="#FFFFFF" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" cx="351" cy="27" r="9"/>
-</g>
-<g id="slider-shape">
-    <circle fill="#FFFFFF" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" cx="297" cy="63" r="9"/>
-</g>
-<g id="slider-scale">
-    <circle fill="#FFFFFF" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" cx="342" cy="99" r="9"/>
-</g>
-<g id="slider-loc">
-    <circle fill="#FFFFFF" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" cx="324" cy="135" r="9"/>
-</g>
-<g id="slider-intensity">
-    <circle fill="#FFFFFF" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" cx="306" cy="171" r="9"/>
-</g>
-<g id="text-skew">
-    <text transform="matrix(1 0 0 1 432 31)" font-family="'brandontext-svg-bold'" font-size="12px">5.04</text>
-</g>
-<g id="text-shape">
-    <text transform="matrix(1 0 0 1 432 67)" font-family="'brandontext-svg-bold'" font-size="12px">0.80</text>
-</g>
-<g id="text-scale">
-    <text transform="matrix(1 0 0 1 432 103)" font-family="'brandontext-svg-bold'" font-size="12px">4.20</text>
-</g>
-<g id="text-loc">
-    <text transform="matrix(1 0 0 1 432 139)" font-family="'brandontext-svg-bold'" font-size="12px">-0.20</text>
-</g>
-<g id="text-intensity">
-    <text transform="matrix(1 0 0 1 432 175)" font-family="'brandontext-svg-bold'" font-size="12px">2.80</text>
-</g>
-<g id="button-christmas">
-    <path fill="#FFFFFF" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" d="M663,99h-84c-6.6,0-12-5.4-12-12v-3
-        c0-6.6,5.4-12,12-12h84c6.6,0,12,5.4,12,12v3C675,93.6,669.6,99,663,99z"/>
-    <text transform="matrix(1 0 0 1 621 90)" font-family="'brandontext-svg-regular'" font-size="12px" text-anchor="middle">Santa Claus</text>
-</g>
-<g id="button-tax">
-    <path fill="#FFFFFF" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" d="M663,135h-84c-6.6,0-12-5.4-12-12v-3
-        c0-6.6,5.4-12,12-12h84c6.6,0,12,5.4,12,12v3C675,129.6,669.6,135,663,135z"/>
-    <text transform="matrix(1 0 0 1 621 126)" font-family="'brandontext-svg-regular'" font-size="12px" text-anchor="middle">Tax Return</text>
-</g>
-<g id="button-defaults">
-    <path fill="#FFFFFF" stroke="#000000" stroke-width="0.25" stroke-miterlimit="10" d="M663,171h-84c-6.6,0-12-5.4-12-12v-3
-        c0-6.6,5.4-12,12-12h84c6.6,0,12,5.4,12,12v3C675,165.6,669.6,171,663,171z"/>
-    <text transform="matrix(1 0 0 1 621 162)" font-family="'brandontext-svg-regular'" font-size="12px" text-anchor="middle">Defaults</text>
-</g>
-<g id="graph-circles">
-</g>
-</svg>
-
-As the sliders show, our holiday effect function allows for extreme flexibility in both shape and location.
-
-Two examples for the model are included for illustrative purposes.  When pressing the "Santa Claus" button, we see a holiday effect corresponding to the ramp-up of searches for "Santa Claus" in Google Trends data. The effect starts to ramp about 7 days before Christmas, reaching its peak on the evening of the 24<sup>th</sup> of December, then abruptly crashing after the holiday.
-
-The "Tax Return" example shows the effect of searches for "Tax Return" in Google Trends data.  Searches do not begin until after April 15th (Tax Day in the United States) and slowly taper off throughout April and into early May.
  
-
 ### Priors
 Typically, we embed the holiday effect function within a larger model, like as a component for the mean of a count distribution.  Using strict priors on the relatively few parameters, the function is able to express a wide variety of holiday effects without overfitting.
 
@@ -267,55 +107,6 @@ Having this prior on the holiday intensity is imperative for the model to work a
 Immediate extensions to the model would be to have correlated structure among the holiday intensities, that would allow for prior beliefs of how holidays act together.  You might know, for instance, that the effects of Labor Day and Memorial Day covary. Therefore, you would want to tie the intensities of each to each other.
 
 
-## Modeling Seasonality
-Along with holidays, another critical component of most time series forecasting is to determine the effect of "seasonality" on the observed data.  We assume the seasonality has a long extent, but could consist of multiple seasonal periods.
-
-To this end we utilize *Dynamic Harmonic Regression*: utilizing Fourier modes to model the seasonality of our data.  The model is a linear combination of sines and cosines, with period chosen to represent the estimated period (yearly, quarterly, weekly, etc.).  Advantages of this approach include:
-* allowing for any length of seasonality
-* mixing different seasonal periods (modeling both yearly and quarterly for instance) 
-* controlling how smooth the seasonal pattern becomes by varying the number of Fourier modes. 
-
-The only real disadvantage of this method is the assumption that the seasonality is fixed; it cannot change over time.  In practice, seasonality is fairly constant, so this is not a big problem, except perhaps for long time series [[7](#7)].
-
-### Seasonal Model
-The seasonality model, $$S(t)$$ for a single seasonal period is 
-<div align="center">
-$$
-S(t) = \sum\limits_{n=1}^{N} a_n \sin\left(\frac{2\pi n t}{T}\right) + b_n \cos\left(\frac{2\pi n t}{T}\right)
-$$
-</div>
-where $$N$$ denotes the number of Fourier modes, and $$T$$ denotes the seasonal period.
-
-We expect only a few modes of the Fourier series are required to capture the seasonal trends. Adding many modes would lead to overfitting in the model, which is another good reason to keep the number of modes low.
-
-## <a name="examples_section"></a>Examples
-To demonstrate the utility of the Bayesian Holiday model, we show how it generalizes on Google Trends data. Google Trends is a feature that shows how often a given term is searched on Google, relative to all other words over a given period of time.
-
-For our examples below, we select the previous five years of data for the given search term, and fit a model using the first four years as training data.  We then use this learned model to predict the timeseries for the fifth year and compare it to the actual search data.
-
-We use a Poisson likelihood, as the Trends data is represented in counts. The mean of the Poisson distribution is modeled with a log-link function comprising three components: a baseline, seasonality features, and the holiday effect.
-
-The baseline is an inferred constant, while seasonality and the holiday effects are the models described above. 
-
-So the full model becomes:
-<div align="center">
-$$
-y(t) \sim \mathrm{Poisson}\left(\exp\left[\alpha + S(t) + H(t)\right]\right)
-$$
-</div>
-
-with
-
-<div align="center">
-$$
-H(t) = \sum\limits_{n=1}^H h_n(t)
-$$
-</div>
-
-Here $$y(t)$$ denotes the number of times the search term appears at time $$t$$. $$S(t)$$ is the seasonal component of the model. We use $$N=3$$ Fourier models throughout and set the period to $$T=52.1429,$$ since the data is weekly. Also, $$h_n(t)$$ is a single holiday instance, and $$H$$ is the number of holidays in the holiday calendar.
-
-This model gets at the crux of the difference between seasonality and holiday effects: seasonality is a global concept, while the holiday effect is localized in time.   
-
 ### Holiday Calendar
 The holidays for the examples were selected from an American calendar:
 * New Year's Day
@@ -332,84 +123,6 @@ The holidays for the examples were selected from an American calendar:
 * Thanksgiving
 * Christmas Day
  
-### Fireworks [[10](#10)]
-Our first example shows the time series of counts for the search term “fireworks” (in black).  The blue lines denote the posterior samples from fitting the model, and the orange lines are the posterior draws for the holdout time period.  Each year is shaded, as are the training (blue) and holdout (orange) time periods.
-
-We see that the model fits the data extremely well!
-
-<figure style="margin-bottom: 1rem;margin-left: 2rem;margin-right: 2rem;">
-  <img alt="The posterior samples (and means) for both in and out of sample inference for the search term fireworks." src="/assets/posts/2020-12-16-tis-the-season-to-be-bayesian/fireworks_worldwide.png"/>
-  <figcaption style="text-align:center"><i>The posterior samples (and means) for in-sample (blue) and out of sample (orange) draws for the search term "fireworks".</i></figcaption>
-</figure>
-<br/>  
-
-
-Inspecting the fit, we see the expected spikes for the Fourth of July and New Year's. 
-
-Since our model is additive, we can observe the effect of individual holidays on the observations.  The following figure shows the individual posterior traces for each holiday in the last two years of training and the full holdout set. 
-
-<figure style="margin-bottom: 1rem;margin-left: 2rem;margin-right: 2rem;">
-  <img alt="The posterior samples (and means) of sample inference for individual holidays for the search term fireworks." src="/assets/posts/2020-12-16-tis-the-season-to-be-bayesian/individual_fireworks.png"/>
-  <figcaption style="text-align:center"><i>The posterior samples (and means) of sample inference for individual holidays for the search term "fireworks".</i></figcaption>
-</figure>
-<br/>
-
-We see that the three spikes in searches are made up of 
-* A Combinations of New Year's Day and Christmas
-* A Combination of Father's Day and Independence Day
-* Halloween (seemingly)
-
-with a small amount of seasonality to model the fit.
-
-The spikes about Independence Day and New Year's are expected, but at least for those living in the United States, the activation of Halloween seems very odd! It is not a traditional holiday to expect fireworks.  To those living in the Commonwealth, however, there is an obvious explanation:  Guy Fawkes Day.
-
-Guy Fawkes day occurs on November 5<sup>th</sup>. It marks the anniversary of the discovery of a plot to blow up the Houses of Parliament in London in 1605. Within the UK it is customary to have both fireworks and bonfires to celebrate the holiday.
-
-This example shows the importance of having the correct holiday calendar for the data that you are modeling.  Having an American calendar to model global data can lead to nonsensical results (as happened in this case).  An important caveat is that our model fits the data to a close holiday (Halloween), and this behavior is a good posterior check to see if your calendar is appropriate.
-
-Another interesting insight is the activation of Father's Day. Father's Day occurs on the third Sunday of June each year. This is another holiday where we would not expect to see prevalent fireworks. In this instance, by looking at the values of the intensities between Father's Day and Independence Day, the model attributes searches for fireworks before July 4<sup>th</sup> *both* to Independence Day *and* Father's Day. 
-
-Given the weakly-informative priors for the baseline model, we do not *a priori* encode any difference between the two holidays, so the model is free to select from either. Knowing we do not expect to see fireworks on Father's Day, we should update our priors to make it search-term specific (i.e. put a much smaller prior on the intensity for Father's Day than that of the 4<sup>th</sup> of July).
-
-The same phenomenon occurs between Christmas and New Year's:  the model estimates the search term counts are due to a split between the two holidays, since no prior information was given to distinguish between them.
-
-
-### Chocolate [[11](#11)]
-The plot below shows a time series of counts for the search term “chocolate” (again in black).  Again, the blue lines denote the posterior samples from fitting the model, and the orange lines are the posterior draws for the holdout time period.
-
-The model does a great job of fitting the time series data. In particular, capturing the spikes near Thanksgiving, Christmas and Valentine's Day. The low-frequency seasonality and baseline capture the remaining counts throughout the year.
-
-<figure style="margin-bottom: 1rem;margin-left: 2rem;margin-right: 2rem;">
-  <img alt="The in-sample (blue) and out of sample (orange) posterior samples (and means) for the search term chocolate." src="/assets/posts/2020-12-16-tis-the-season-to-be-bayesian/chocolate.png"/>
-  <figcaption style="text-align:center"><i>The in-sample (blue) and out of sample (orange) posterior samples (and means) for the search term "chocolate".</i></figcaption>
-</figure> 
-<br/>  
-
-An interesting artifact of the holdout time period, is that the model completely misses the lift in searches around March of 2020.  This is due to the model extrapolating from historical data, and there has never historically been a lot of searches for chocolate in March.  One thing that also has never occured in March is a large number of people sheltering-in-place due to COVID-19. Perhaps staying at home during a global pandemic makes people want chocolate?
-
-
-### Pumpkin Spice [[12](#12)]
-Our last example shows the power of the model to fit "holidays" that do not fit a typical calendar definition.  The search term "Pumpkin Spice" aligns with the (re-)introduction of the Pumpkin Spice Latte (PSL) from Starbucks each autumn.  
-
-The fit against the searches below shows a few interesting observations:  The first is that the searches occur over a long period of time (early September through late November).  The second is that the overall lift is punctuated by spikes of searches in two areas (seemingly early September and mid-November).
-
-<figure style="margin-bottom: 1rem;margin-left: 2rem;margin-right: 2rem;">
-  <img alt="The posterior samples (and means) of sample inference for individual holidays for the search term pumpkin spice." src="/assets/posts/2020-12-16-tis-the-season-to-be-bayesian/pumpkin_spice.png"/>
-  <figcaption style="text-align:center"><i>The posterior samples (and means) of sample inference for individual holidays for the search term "pumpkin spice".</i></figcaption>
-</figure>
-<br/>
-
-So how is the model fitting this data?  Through a combination of seasonality and holiday effects. As seen in the following figure, coupled with the seasonal component modeling the long duration lift, a combination of Labor Day and Thanksgiving lead to the fit we expect for people searching for their PSLs. 
-
-<figure style="margin-bottom: 1rem;margin-left: 2rem;margin-right: 2rem;">
-  <img alt="The posterior samples (and means) of sample inference for seasonality and individual holidays for the search term pumpkin spice." src="/assets/posts/2020-12-16-tis-the-season-to-be-bayesian/individual_ps.png"/>
-  <figcaption style="text-align:center"><i>The posterior samples (and means) of sample inference for seasonality and individual holidays for the search term "pumpkin spice".</i></figcaption>
-</figure>
-<br/>
-
-In this example, Labor Day is doing the work of fitting the spike at the beginning of the PSL promotion at Starbucks.  Our simplistic model has limited power to capture this dynamic, so it utilizes the closest holiday to the start of the promotion, namely Labor Day.  In reality, a Starbuck's model would probably also include data features like marketing spend and other components that would allow for robust inference in the true domain.
-
-Furthermore, the posterior samples for Labor Day expose a weakness of the model:  there is no hard constraint that prevents any holiday from having support for long periods of time.  Therefore, Labor Day, which occurs in early September, has support over a full two months leading up to the holiday. An extension of the model would be to enforce compact support for each holiday to be within the time period between the previous to the next holiday. So in this instance, the support for Labor Day could not surpass Independence Day previously, nor exceed Columbus Day/Indiginous People's Day going forward.
 
 
 ## Conclusion
@@ -471,159 +184,3 @@ Juho Piironen and Aki Vehtari. “Sparsity information and regularization in the
 
 <a id="12">[12]</a>
 [Pumpkin Spice Google Trends](https://trends.google.com/trends/explore?date=2015-11-02%202020-11-02&geo=US&q=pumpkin%20spice)
-
-<script src="https://d3js.org/d3.v4.min.js"></script>
-
-<script>
-
-// config
-
-var slider_config = {
-  skew: {min: -5, max: 5, val: 0.0},
-  shape: {min: 0.5, max: 10, val: 1.0},
-  scale: {min: 0.1, max: 10, val: 1.0},
-  loc: {min: -10, max: 20, val: 0.0},
-  intensity: {min: -2.0, max: 2.0, val: 1.0},
-}
-
-var presets = {
-  'christmas': {
-    skew: -4.89,
-    shape: 1.1,
-    scale: 2.3,
-    loc: -0.5,
-    intensity: 1.68,
-  },
-  'tax': {
-    skew: 5.04,
-    shape: 0.8,
-    scale: 4.2,
-    loc: -0.2,
-    intensity: 2.0,
-  },
-  'defaults': {
-    skew: 0.0,
-    shape: 1.0,
-    scale: 1.0,
-    loc: 0.0,
-    intensity: 1.0,
-  }
-}
-
-// internal variables
-var slider_x_min = 279
-var slider_x_max = 387
-var y0 = 99.6
-var y1 = 63.7
-var dy = y1 - y0
-var x0 = 99.4
-var x10 = 135.4
-var dx = (x10 - x0) / 10
-var holiday_graph_data
-
-// compute the graph data
-function compute_graph(slider_config) {
-
-  const h_skew = slider_config.skew.val
-  const h_shape = slider_config.shape.val
-  const h_scale = slider_config.scale.val
-  const h_loc = slider_config.loc.val
-  const lam = slider_config.intensity.val
-
-  var data_out = []
-  for (var i = 0; i < 1200; i++) {
-    var x = -20 + 0.05*i
-    var z = (x-h_loc) / h_scale
-    var y = 2.0 * lam * Math.exp(-1.0*Math.pow(Math.abs(z),h_shape)) /
-             (1.0 + Math.exp(-h_skew * z))
-    data_out.push({x: x, y: y})
-  }
-
-  return data_out
-}
-
-// update the graph (including calling compute)
-function update_graph(duration){
-
-  holiday_graph_data = compute_graph(slider_config)
-
-  var valueline = d3.line()
-    .x(d => x0 + dx * d.x)
-    .y(d => y0 + dy * d.y)
-
-  d3.select("#graph-circles").selectAll("path").data([holiday_graph_data])
-    .transition().duration(duration)
-      .attr("d", valueline)
-  
-}
-
-// update sliders (and call graph update)
-function update_slider(key, new_val, duration){
-
-  // slider value
-  slider_config[key].val = new_val
-
-  // slider location
-  var k = (new_val - slider_config[key].min) / (slider_config[key].max - slider_config[key].min)
-  var new_cx = slider_x_min + k * (slider_x_max - slider_x_min)
-  d3.select("#slider-" + key).select("circle")
-    .transition().duration(duration)
-      .attr("cx", new_cx)
-
-  // slider text
-  d3.select("#text-" + key).select("text").text("" + new_val.toFixed(2))
-
-  // update graph
-  update_graph(duration)
-
-}
-
-
-// initializations on page load
-function on_load(){
-
-  // sliders
-  Object.keys(slider_config).forEach(function(key){
-
-    // right-align text outputs
-    d3.select("#text-" + key).select("text").attr("text-anchor", "end")
-
-    // initialize slider locations
-    update_slider(key, slider_config[key].val)
-
-    // slider action
-    d3.select("#slider-" + key).select("circle")
-      .style("cursor", "pointer")
-      .call(d3.drag().on("drag", function() {
-        var new_cx = Math.max(slider_x_min, Math.min(slider_x_max, d3.event.x))
-        var k = (new_cx - slider_x_min) / (slider_x_max - slider_x_min)
-        var new_val = slider_config[key].min + k * (slider_config[key].max - slider_config[key].min)
-        update_slider(key, new_val, 0)
-      }))
-
-  })
-
-  // buttons
-  Object.keys(presets).forEach(function(key){
-    d3.select("#button-" + key).selectAll("path, text").style("cursor", "pointer")
-      .on("click", function() {
-        Object.keys(presets[key]).forEach(function(slider_key){
-          update_slider(slider_key,  presets[key][slider_key], 750)
-        })
-      })
-  })
-
-  // graph
-  d3.select("#graph-circles").selectAll("path").data([holiday_graph_data])
-    .enter().append("path")
-      .style("stroke-width", 2)
-      .style("stroke", "#ff5c61")
-      .style("fill", "none")
-
-  update_graph()
-
-}
-
-on_load()
-
-</script>
