@@ -12,7 +12,6 @@ install_requires = [
 
 setup(
     name=package,
-    version=__version__,
     author="Daniel Marthaler",
     author_email="dan.marthaler@gmail.com",
     description="Bayesian Holiday Model for Time Series",
