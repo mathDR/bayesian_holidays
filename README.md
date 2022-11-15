@@ -19,7 +19,7 @@ To robustly capture holiday effects within time series data, a model should meet
 * Discovery of peak location: Holiday effects may peak close to, but not exactly on, a holiday date.
 * Sparsity: Holiday effects should be used sparingly, so as not to explain too much variation in the data.
 
-Standard strategies for modeling holidays incorporate them as additive components into a model, and focus on the use of indicator variables for each holiday [[6](#6), [7](#7)]. This strategy places a "yes" on holiday dates and a "no" on the other days, "indicating" which dates are active. To do this, one has to know all of the holiday dates on which to place a "yes." The dates must include each occurrence of the holiday going back in time over all of the training data, and going forward, over the dates you wish to forecast against.  An extension to this idea is having additional indicator variables within a user-specified range of dates before or after the holiday  [[2](#2),[4](#4),[5](#6)]. However, if the holiday effect is long-lasting, growth in the number of indicator variables can lead the model to overfit, especially when the data is sparse.
+Standard strategies for modeling holidays incorporate them as additive components into a model, and focus on the use of indicator variables for each holiday [[1](#1), [2](#2)]. This strategy places a "yes" on holiday dates and a "no" on the other days, "indicating" which dates are active. To do this, one has to know all of the holiday dates on which to place a "yes." The dates must include each occurrence of the holiday going back in time over all of the training data, and going forward, over the dates you wish to forecast against.  An extension to this idea is having additional indicator variables within a user-specified range of dates before or after the holiday  [[3](#3),[4](#4),[5](#5)]. However, if the holiday effect is long-lasting, growth in the number of indicator variables can lead the model to overfit, especially when the data is sparse.
 
 Below, we outline an approach that simultaneously minimizes overfitting with holidays, while also allowing for determining the contribution of individual holidays to the overall effect of the time series.  
 
@@ -33,7 +33,7 @@ To generate a flexible model that encompasses all of the criteria above, we borr
 
 The effect from an individual holiday is modeled as a function of the difference between the date of the observation, and the closest date of that holiday. For example, if only Christmas and Easter are included in your holiday calendar, then the observation on February 12 would have holiday features [-49, 60], since it is 49 days (previous) since the nearest Christmas, and 60 days until the nearest Easter. The holiday effect for February 12 would then be a function of these features.
 
-If there are $H$ holidays considered in the model, then each observation has $H$ holiday features as input to the model ($H=2$ in the above example).
+If there are $H$ holidays considered in the model, then each observation has $H$ holiday features as input to the model ( $H=2$ in the above example).
 
 ### The Holiday Effect Function
 Generating a model that encompasses all of the criteria we outlined above involves combining a lot of ingredients.
@@ -69,11 +69,11 @@ For the parameters in the model, the distributions chosen were:
 + $\sigma \sim \textrm{Gamma}\left(k_{\sigma}, \theta_{\sigma}\right)$.
 + $\omega  \sim \textrm{Gamma}\left(k_{\omega},\theta_{\omega}\right)$.
 + $\kappa \sim \mathcal{N}\left(0, \sigma_{\kappa}\right)$.
-+ $\lambda$ is drawn from a regularized horseshoe [[9](#9)]
++ $\lambda$ is drawn from a regularized horseshoe [[6](#6)]
 
 Setting the prior mean for $\mu$ at zero implies we expect the effect to peak on the official holiday date. The standard deviation for the location, $\sigma_{\mu},$ should be chosen such that each holiday doesn’t drift too far away from its original location.  The coefficients of $\sigma$ are chosen such that the locality of each holiday is controlled; preventing the effects of one holiday from exceeding the dates of its closest holiday neighbors.  The scale and skew can be tuned to implement beliefs in how the effect of the holiday persists about the holiday date.  Of course, using weakly informative priors here is a good alternative strategy if no prior information about your data are known (but this is rarely the case!).
 
-The regularized horseshoe prior [[9](#9)] for $\lambda$ can be considered as a continuous extension of the spike-and-slab prior. This is a way of merging a prior at zero (the "spike") with a prior away from zero (the "slab"), and letting the model decide if the coefficient should have a non-zero posterior.  This encourages sparsity and resists using holidays to explain minor variation in the data.
+The regularized horseshoe prior [[6](#6)] for $\lambda$ can be considered as a continuous extension of the spike-and-slab prior. This is a way of merging a prior at zero (the "spike") with a prior away from zero (the "slab"), and letting the model decide if the coefficient should have a non-zero posterior.  This encourages sparsity and resists using holidays to explain minor variation in the data.
 
 
 #### Regularized Horseshoe
@@ -91,7 +91,7 @@ c^2 &\sim \textrm{Inv-Gamma}\left(\frac{\nu}{2},s^2\frac{\nu}{2}\right) \\
 
 where $h_0$ is the expected number of active holidays, and $H$ is the total number of unique holidays in the holiday calendar.
 
-The prior on $$c^2$$ translates to a Student-$t_{\nu}\left(0, s^2\right)$ slab for the coefficients far from zero. We choose $s = 3$ and $\nu = 25$ and are typically good default choices for a weakly informative prior [[9](#9)].
+The prior on $$c^2$$ translates to a Student-$t_{\nu}\left(0, s^2\right)$ slab for the coefficients far from zero. We choose $s = 3$ and $\nu = 25$ and are typically good default choices for a weakly informative prior [[6](#6)].
 
 Having this prior on the holiday intensity is imperative for the model to work at all.  Having no sparsity-preserving prior leads to each holiday being activated to overfit the observed data.  Enforcing regularization via the horseshoe allows for realistic intensity values to be inferred from the data.
 
@@ -126,20 +126,19 @@ Part of this work was done with Alex Braylan while the author was at Revionics (
 
 
 ## References
-<a id="1">[1]</a>
-[The Perils of Prediction](https://www.economist.com/letters-to-the-editor-the-inbox/2007/07/15/the-perils-of-prediction-june-2nd)
+<a id="1">[1]</a> 
+Sean J. Taylor and Benjamin Letham. "Forecasting at scale". The American Statistician (2017).
 
-<a id="2">[2]</a> 
+<a id="2">[2]</a>
+Rob J. Hyndman and George Athanasopoulos. Forecasting: Principles and Practice,
+online: https://otexts.com/fpp2/ (2012)
+
+<a id="3">[3]</a> 
 Tucker S. McElroy, Brian C. Monsell, and
 Rebecca Hutchinson.  “Modeling of Holiday
 Effects and Seasonality in Daily Time Series.”
 Center for Statistical Research and Methodology
 Report Series RRS2018/01. Washington: US Census Bureau (2018).
-
-<a id="3">[3]</a> 
-Usha Ramanathan and Luc Muyldermana. "Identifying demand factors for promotional
-planning and forecasting: A case of a soft drink company in the UK". International Journal of
-Production Economics, 128 (2), 538-545 (2010)
 
 <a id="4">[4]</a>
 Nari S. Arunraj and Diane Ahrens. "Estimation of non-catastrophic weather
@@ -149,26 +148,5 @@ Management, 44:731–753 (2016)
 <a id="5">[5]</a> 
 Florian Ziel. "Modeling public holidays in load forecasting: a German case study". Journal of Modern Power Systems and Clean Energy 6(2):191–207 (2018).
 
-<a id="6">[6]</a> 
-Sean J. Taylor and Benjamin Letham. "Forecasting at scale". The American Statistician (2017).
-
-<a id="7">[7]</a>
-Rob J. Hyndman and George Athanasopoulos. Forecasting: Principles and Practice,
-online: https://otexts.com/fpp2/ (2012)
-
-<a id="8">[8]</a>
-Andrew Gelman, Aki Vehtari, Daniel Simpson, Charles C. Margossian, 
-Bob Carpenter, Yuling Yao, Lauren Kennedy, Jonah Gabry, Paul-Christian Bürkner, 
-Martin Modrák. Bayesian Workflow. https://dpsimpson.github.io/pages/talks/Bayesian_Workflow.pdf
-
-<a id="9">[9]</a>
+<a id="6">[6]</a>
 Juho Piironen and Aki Vehtari. “Sparsity information and regularization in the horseshoe and other shrinkage priors.” Electronic Journal of Statistics, 11(2): 5018–5051 (2017)
-
-<a id="10">[10]</a>
-[Fireworks Google Trends](https://trends.google.com/trends/explore?date=2015-11-02%202020-11-02&geo=US&q=fireworks)
-
-<a id="11">[11]</a>
-[Chocolate Google Trends](https://trends.google.com/trends/explore?date=2015-11-02%202020-11-02&geo=US&q=chocolate)
-
-<a id="12">[12]</a>
-[Pumpkin Spice Google Trends](https://trends.google.com/trends/explore?date=2015-11-02%202020-11-02&geo=US&q=pumpkin%20spice)
