@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import expit
 import pandas as pd
 from typing import Dict, List
 
@@ -113,10 +114,6 @@ def fourier_design_matrix(
     return np.asarray(np.stack(columns))
 
 
-def logistic(x):
-    return 1.0 / (1.0 + np.exp(-x))
-
-
 def create_mask_logistic(times: np.ndarray, holiday_list: pd.DataFrame):
     """
     This function produces a continuous "mask" that is the
@@ -134,6 +131,8 @@ def create_mask_logistic(times: np.ndarray, holiday_list: pd.DataFrame):
         [prev_hol_date, post_hol_date])
       alpha ~ log(2) / (rho * (post_hol_date-prev_hol_date)), where
       rho = prob outside of tails.
+
+    Note, in scipy, the logistic() function is called as expit()
     """
     num_holidays = holiday_list.HolidayId.max()
     num_dates = times.shape[0]
@@ -155,9 +154,9 @@ def create_mask_logistic(times: np.ndarray, holiday_list: pd.DataFrame):
             xL = times[ind] - pd.to_timedelta(series.days_behind_diff, unit="d")
             xU = times[ind] + pd.to_timedelta(series.days_ahead_diff, unit="d")
             alpha = LOG2 / (0.01 * (xU - xL).dt.days)
-            mask_array[series.HolidayId - 1, ind,] = logistic(
+            mask_array[series.HolidayId - 1, ind,] = expit(
                 alpha * ((times[ind] - xL)).dt.days.values
-            ) * logistic(-alpha * ((times[ind] - xU)).dt.days.values)
+            ) * expit(-alpha * ((times[ind] - xU)).dt.days.values)
 
     return mask_array
 
