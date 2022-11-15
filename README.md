@@ -1,21 +1,12 @@
 # bayesian_holidays
 A Bayesian Holiday Time Series Model
 
-As Mark Twain may have said:  “Prediction is very difficult, especially about the future” [[1](#1)].  Alas, at Stitch Fix we do this all the time. Specifically, we need to predict upcoming demand for our inventory. This allows us to determine which clothes to stock, so we can order the correct number of units for each item, and to allocate those units to the right warehouses, allowing us to deliver delightful fixes for our clients!
-
-As the year unfolds, our demand fluctuates. Two big drivers of that fluctuation are seasonality and holidays. With the holiday season upon us, it's a great time to describe how both seasonality and holiday effects can be estimated, and how you can use this formulation in a predictive time series model.
-
-In this post, we describe the difference between seasonality and holiday effects, posit a general Bayesian Holiday Model, and show how that model performs on some Google Trends data.
-
-If you want to skip to the examples, click [here](#examples_section).
 
 ## Seasonality vs Holidays
 
-For the purpose of this post, we are using the term “holiday” to denote an important yearly date that affects your data observations.  This usually means days like Christmas and New Year’s Eve, but it could also refer to dates like the Superbowl, the first day of school, or when hunting season starts.
+This repo uses the term “holiday” to denote an important yearly date that affects your data observations.  This usually means days like Christmas and New Year’s Eve, but it could also refer to dates like the Superbowl, the first day of school, or when hunting season starts.
 
 Holidays are in contrast to "seasonality," which is a longer term effect that can persist over multiple weeks or months.  We will see that both contribute to our data observations, and distinguishing between them is important when we want to make decisions based on the outcome of our model.
-
-Holiday effects show up in many different sorts of time series, including retail sales [[2](#2), [3](#3), [4](#4)], electrical load [[5]](#5), social media events [[6]](#6), along with many others.
 
 Unfortunately, holiday effect data is sparse, since most holidays occur only once a year.  Furthermore, many holidays are entwined within certain "seasonal" time periods. This makes modeling the effect especially difficult.
 
@@ -42,12 +33,12 @@ To generate a flexible model that encompasses all of the criteria above, we borr
 
 The effect from an individual holiday is modeled as a function of the difference between the date of the observation, and the closest date of that holiday. For example, if only Christmas and Easter are included in your holiday calendar, then the observation on February 12 would have holiday features [-49, 60], since it is 49 days (previous) since the nearest Christmas, and 60 days until the nearest Easter. The holiday effect for February 12 would then be a function of these features.
 
-If there are $$H$$ holidays considered in the model, then each observation has $$H$$ holiday features as input to the model ($$H=2$$ in the above example).
+If there are $H$ holidays considered in the model, then each observation has $H$ holiday features as input to the model ($H=2$ in the above example).
 
 ### The Holiday Effect Function
 Generating a model that encompasses all of the criteria we outlined above involves combining a lot of ingredients.
 
-Our holiday effect function $$h(t)$$ describes the effect of the holiday at date $$t$$ as:  
+Our holiday effect function $h(t)$ describes the effect of the holiday at date $t$ as:  
 
 $$
 h(t) = 2 \lambda \frac{\exp\left(-|z(t)|^\omega\right)}{1+\exp\left(-\kappa z(t)\right)}
@@ -61,11 +52,11 @@ $$
 
 
 where
-+ $$\mu$$ is the location parameter - it denotes how “offset” the effect is from the actual holiday date
-+ $$\sigma$$ is the scale parameter - it denotes how broad the effect of the holiday is over time
-+ $$\omega$$ is the shape parameter - it denotes how “peaky” the effect is in time
-+ $$\kappa$$ is the skew parameter - it denotes how asymmetrical the holiday effect is around $$\mu$$
-+ $$\lambda$$ is the intensity parameter - this denotes the magnitude of the holiday effect.
++ $\mu$ is the location parameter - it denotes how “offset” the effect is from the actual holiday date
++ $\sigma$ is the scale parameter - it denotes how broad the effect of the holiday is over time
++ $\omega$ is the shape parameter - it denotes how “peaky” the effect is in time
++ $\kappa$ is the skew parameter - it denotes how asymmetrical the holiday effect is around $\mu$
++ $\lambda$ is the intensity parameter - this denotes the magnitude of the holiday effect.
 
  
 ### Priors
@@ -74,20 +65,20 @@ Typically, we embed the holiday effect function within a larger model, like as a
 Setting priors for the parameters of the holiday effect function is done similarly to other Bayesian workflows [[8](#8)]:  Prior predictive checks should be completed to determine relevant scales and default values.
 
 For the parameters in the model, the distributions chosen were:
-+ $$\mu \sim \mathcal{N}\left(0, \sigma_{\mu}\right)$$.
-+ $$\sigma \sim \textrm{Gamma}\left(k_{\sigma}, \theta_{\sigma}\right)$$.
-+ $$\omega  \sim \textrm{Gamma}\left(k_{\omega},\theta_{\omega}\right)$$.
-+ $$\kappa \sim \mathcal{N}\left(0, \sigma_{\kappa}\right)$$.
-+ $$\lambda$$ is drawn from a regularized horseshoe [[9](#9)]
++ $\mu \sim \mathcal{N}\left(0, \sigma_{\mu}\right)$.
++ $\sigma \sim \textrm{Gamma}\left(k_{\sigma}, \theta_{\sigma}\right)$.
++ $\omega  \sim \textrm{Gamma}\left(k_{\omega},\theta_{\omega}\right)$.
++ $\kappa \sim \mathcal{N}\left(0, \sigma_{\kappa}\right)$.
++ $\lambda$ is drawn from a regularized horseshoe [[9](#9)]
 
-Setting the prior mean for $$\mu$$ at zero implies we expect the effect to peak on the official holiday date. The standard deviation for the location, $$\sigma_{\mu},$$ should be chosen such that each holiday doesn’t drift too far away from its original location.  The coefficients of $$\sigma$$ are chosen such that the locality of each holiday is controlled; preventing the effects of one holiday from exceeding the dates of its closest holiday neighbors.  The scale and skew can be tuned to implement beliefs in how the effect of the holiday persists about the holiday date.  Of course, using weakly informative priors here is a good alternative strategy if no prior information about your data are known (but this is rarely the case!).
+Setting the prior mean for $\mu$ at zero implies we expect the effect to peak on the official holiday date. The standard deviation for the location, $\sigma_{\mu},$ should be chosen such that each holiday doesn’t drift too far away from its original location.  The coefficients of $\sigma$ are chosen such that the locality of each holiday is controlled; preventing the effects of one holiday from exceeding the dates of its closest holiday neighbors.  The scale and skew can be tuned to implement beliefs in how the effect of the holiday persists about the holiday date.  Of course, using weakly informative priors here is a good alternative strategy if no prior information about your data are known (but this is rarely the case!).
 
-The regularized horseshoe prior [[9](#9)] for $$\lambda$$ can be considered as a continuous extension of the spike-and-slab prior. This is a way of merging a prior at zero (the "spike") with a prior away from zero (the "slab"), and letting the model decide if the coefficient should have a non-zero posterior.  This encourages sparsity and resists using holidays to explain minor variation in the data.
+The regularized horseshoe prior [[9](#9)] for $\lambda$ can be considered as a continuous extension of the spike-and-slab prior. This is a way of merging a prior at zero (the "spike") with a prior away from zero (the "slab"), and letting the model decide if the coefficient should have a non-zero posterior.  This encourages sparsity and resists using holidays to explain minor variation in the data.
 
 
 #### Regularized Horseshoe
 The coefficient for the intensity of each holiday (the $$\lambda$$ parameter) is determined by the following prior:
-<div align="center">
+
 $$\begin{aligned}
 \lambda &\sim \mathcal{N}\left(0,\tilde{\lambda_h}^2 \tau^2\right) \\
 \tilde{\lambda_h}^2 &= \frac{c^2 \lambda_h^2}{c^2 + \tau^2\lambda_h^2} \\
@@ -96,11 +87,11 @@ c^2 &\sim \textrm{Inv-Gamma}\left(\frac{\nu}{2},s^2\frac{\nu}{2}\right) \\
 \tau^2 &\sim \textrm{Cauchy}^{+}\left(0,\tau_0\right) \\
 \tau_0 &= \frac{h_0}{H-h_0}
 \end{aligned}$$
-</div>
 
-where $$h_0$$ is the expected number of active holidays, and $$H$$ is the total number of unique holidays in the holiday calendar.
 
-The prior on $$c^2$$ translates to a Student-$$t_{\nu}\left(0, s^2\right)$$ slab for the coefficients far from zero. We choose $$s = 3$$ and $$\nu = 25$$ and are typically good default choices for a weakly informative prior [[9](#9)].
+where $h_0$ is the expected number of active holidays, and $H$ is the total number of unique holidays in the holiday calendar.
+
+The prior on $$c^2$$ translates to a Student-$t_{\nu}\left(0, s^2\right)$ slab for the coefficients far from zero. We choose $s = 3$ and $\nu = 25$ and are typically good default choices for a weakly informative prior [[9](#9)].
 
 Having this prior on the holiday intensity is imperative for the model to work at all.  Having no sparsity-preserving prior leads to each holiday being activated to overfit the observed data.  Enforcing regularization via the horseshoe allows for realistic intensity values to be inferred from the data.
 
@@ -124,17 +115,14 @@ The holidays for the examples were selected from an American calendar:
 * Christmas Day
  
 
-
 ## Conclusion
 Having a principled holiday effect function embedded within your time series model is crucial to be able to extract knowledge about how holidays affect your observed data.  
 
 Being able to decompose individual effects is a powerful tool to determine if your strategies or decisions are doing what you expect.  Furthermore, having a flexible model let's you determine if you are even using the right holiday calendar!
 
-Happy Holidays from all of us at Stitch Fix!!
-
 
 ## Attributions
-Part of this work was done with Alex Braylan while the author was at Revionics (now Atios), and presented at StanCon Helsinki in August 2018. 
+Part of this work was done with Alex Braylan while the author was at Revionics (now Atios), and presented at StanCon Helsinki in August 2018. This README is a concatenation of a [blogpost](https://multithreaded.stitchfix.com/blog/2020/12/16/tis-the-season-to-be-bayesian/) written by Daniel Marthaler.
 
 
 ## References
