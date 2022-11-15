@@ -91,7 +91,7 @@ c^2 &\sim \textrm{Inv-Gamma}\left(\frac{\nu}{2},s^2\frac{\nu}{2}\right) \\
 
 where $h_0$ is the expected number of active holidays, and $H$ is the total number of unique holidays in the holiday calendar.
 
-The prior on $$c^2$$ translates to a Student-$t_{\nu}\left(0, s^2\right)$ slab for the coefficients far from zero. We choose $s = 3$ and $\nu = 25$ and are typically good default choices for a weakly informative prior [[6](#6)].
+The prior on $c^2$ translates to a Student-$t_{\nu}\left(0, s^2\right)$ slab for the coefficients far from zero. We choose $s = 3$ and $\nu = 25$ and are typically good default choices for a weakly informative prior [[6](#6)].
 
 Having this prior on the holiday intensity is imperative for the model to work at all.  Having no sparsity-preserving prior leads to each holiday being activated to overfit the observed data.  Enforcing regularization via the horseshoe allows for realistic intensity values to be inferred from the data.
 
