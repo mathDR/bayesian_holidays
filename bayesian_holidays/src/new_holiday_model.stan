@@ -203,7 +203,7 @@ generated quantities {
 
   row_vector[num_test_dates] test_baseline;
 
-  test_baseline = rep_row_vector(alpha, num_test_dates);
+  test_log_baseline = rep_row_vector(alpha, num_test_dates);
   test_holiday_effect = get_holiday_lift(
       h_skew, h_shape, h_scale, h_loc, intensity, d_peak_test, hol_mask_test
   );

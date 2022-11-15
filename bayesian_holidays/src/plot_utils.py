@@ -1,17 +1,17 @@
 import matplotlib.pyplot as plt
+from scipy.special import expit
 from ..src.utils import create_d_peak, create_mask_logistic, get_holiday_dataframe
 
 
-def plot_posteriors(df, df_fit, filename, plot_train=True, plot_test=True):
+def plot_posteriors(df, df_fit, name=None, plot_train=True, plot_test=True):
     alpha = df_fit.stan_variable("alpha")
     seasonality = df_fit.stan_variable("seasonality")
     holiday_effect = df_fit.stan_variable("holiday_effect")
     log_mu = alpha.reshape(-1, 1) + seasonality + holiday_effect
-    # log_mu = df_fit.stan_variable('obs_mean');
+
     test_seasonality = df_fit.stan_variable("test_seasonality")
     test_holiday_effect = df_fit.stan_variable("test_holiday_effect")
     test_log_mu = alpha.reshape(-1, 1) + test_seasonality + test_holiday_effect
-    # test_log_mu = df_fit.stan_variable('test_obsmean')
 
     train_date = df.date.iloc[int(0.8 * df.shape[0])]
 
@@ -49,57 +49,33 @@ def plot_posteriors(df, df_fit, filename, plot_train=True, plot_test=True):
         ax.set_xlim(pd.to_datetime(start_date), df_train.date.max())
     elif plot_test:
         ax.plot(df_test.date, df_test.observed, label="Observed", lw=2, color="black")
+
     ax.set_xlabel("Date")
     ax.set_ylabel("Observed")
-    # ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left');
+
     ax.legend(loc="upper left")
-    first_date = "2016-01-01"
-    for i in range(0, 5, 2):
-        plt.axvspan(
-            pd.to_datetime(first_date) + i * pd.offsets.DateOffset(years=1),
-            pd.to_datetime(first_date) + (i + 1) * pd.offsets.DateOffset(years=1),
-            facecolor="gray",
-            alpha=0.15,
-        )
-        # plt.axvline(pd.to_datetime(first_date) + i*pd.offsets.DateOffset(years=1),
-        #            color='red', lw=2)
-    plt.axvspan(
-        df_train.date.min(), df_train.date.max(), facecolor="powderblue", alpha=0.15
-    )
+
     plt.axvspan(df_test.date.min(), df_test.date.max(), facecolor="orange", alpha=0.15)
-    # plt.axvline(df_test.date.min(),
-    #            color='orange', lw=3)
-    for tt in ax.get_xticklabels()[-2:]:
-        tt.set_color("orange")
-    name = filename.split("/")[-1].split(".csv")[0]
-    if "fireworks" in name:
-        name = name.split("_")[0]
-    plt.title(name)
+    plt.axvline(df_test.date.min(), color="orange", lw=3)
+    if name is not None:
+        plt.title(name)
     plt.ylim(0.8 * df.observed.min(), 1.1 * df.observed.max())
-    plt.xlim(pd.to_datetime(first_date), df.date.max())
-    l = [
-        (pd.to_datetime(first_date) + pd.offsets.DateOffset(months=5)).date(),
-        (pd.to_datetime("2017-01-01") + pd.offsets.DateOffset(months=5)).date(),
-        (pd.to_datetime("2018-01-01") + pd.offsets.DateOffset(months=5)).date(),
-        (pd.to_datetime("2019-01-01") + pd.offsets.DateOffset(months=5)).date(),
-        (pd.to_datetime("2020-01-01") + pd.offsets.DateOffset(months=5)).date(),
-    ]
-    ax.set_xticks(l)
-    ax.set_xticklabels([k.year for k in l])
+    plt.xlim(pd.to_datetime(df.date.min()), df.date.max())
+
     plt.show()
     return None
 
 
 def plot_components(
-    df, df_fit, filename, start_date="2016-01-01", plot_train=True, plot_test=True
+    df, df_fit, name=None, start_date="2016-01-01", plot_train=True, plot_test=True
 ):
-    baseline = df_fit.stan_variable("baseline").values
-    seasonality = df_fit.stan_variable("seasonality").values
-    holiday_effect = df_fit.stan_variable("holiday_effect").values
+    baseline = df_fit.stan_variable("baseline")
+    seasonality = df_fit.stan_variable("seasonality")
+    holiday_effect = df_fit.stan_variable("holiday_effect")
 
-    test_baseline = df_fit.stan_variable("test_baseline").values
-    test_seasonality = df_fit.stan_variable("test_seasonality").values
-    test_holiday_effect = df_fit.stan_variable("test_holiday_effect").values
+    test_baseline = df_fit.stan_variable("test_baseline")
+    test_seasonality = df_fit.stan_variable("test_seasonality")
+    test_holiday_effect = df_fit.stan_variable("test_holiday_effect")
 
     train_date = df.date.iloc[int(0.8 * df.shape[0])]
 
@@ -108,11 +84,6 @@ def plot_components(
 
     fig, ax = plt.subplots(figsize=(18, 12))
     if plot_train:
-        #         p = ax.plot(df_train.date, np.exp(baseline[0,:]), alpha=0.05)
-        #         clr = p[0].get_color()
-        #         for i in range(1,baseline.shape[0]):
-        #             ax.plot(df_train.date, np.exp(baseline[i,:]), color=clr, alpha=0.05)
-        #         ax.plot(df_train.date, np.exp(np.mean(baseline,axis=0)),label='Mean of Posterior Baseline');
         p = ax.plot(df_train.date, np.exp(seasonality[0, :]), alpha=0.05)
         clr = p[0].get_color()
         for i in range(1, seasonality.shape[0]):
@@ -132,11 +103,6 @@ def plot_components(
             label="Mean of Posterior Holiday Effect",
         )
     if plot_test:
-        #         p = ax.plot(df_test.date, np.exp(test_baseline[0,:]), alpha=0.05)
-        #         clr = p[0].get_color()
-        #         for i in range(1,test_baseline.shape[0]):
-        #             ax.plot(df_test.date, np.exp(test_baseline[i,:]), color=clr, alpha=0.05)
-        #         ax.plot(df_test.date, np.exp(np.mean(test_baseline,axis=0)),label='Mean of Posterior Baseline OOS');
         p = ax.plot(df_test.date, np.exp(test_seasonality[0, :]), alpha=0.05)
         clr = p[0].get_color()
         for i in range(1, test_seasonality.shape[0]):
@@ -178,28 +144,24 @@ def plot_components(
             facecolor="gray",
             alpha=0.25,
         )
-    plt.title(filename.split("/")[-1].split(".csv")[0])
+    if name is not None:
+        plt.title(name)
     plt.show()
     return None
 
 
-def inv_logit(u):
-    return 1.0 / (1.0 + np.exp(-u))
-
-
 def get_holiday_lift(h_skew, h_shape, h_scale, h_loc, intensity, d_peak, hol_mask):
-    num_holidays, num_dates = d_peak.shape
-    tdd = np.zeros((h_loc.shape[0], h_loc.shape[1], d_peak[0, :].shape[0]))
-
-    for h in range(num_holidays):
-        z = (d_peak[h, :] - h_loc[h]) / h_scale[h]
-        tdd += (
-            2.0
-            * intensity[h]
-            * np.exp(-np.abs(z) ** h_shape[h])
-            * inv_logit(h_skew[h] * z)
-            * hol_mask[h, :]
-        )
+    z = (
+        np.expand_dims(d_peak_test, axis=0) - np.expand_dims(h_loc, axis=2)
+    ) / np.expand_dims(h_scale, axis=2)
+    tdd = np.sum(
+        2.0
+        * np.expand_dims(intensity, axis=2)
+        * np.exp(-np.abs(z) ** np.expand_dims(h_shape, axis=2))
+        * expit(np.expand_dims(h_skew, axis=2) * z)
+        * np.expand_dims(hol_mask, axis=0),
+        axis=1,
+    )
     return tdd
 
 
@@ -230,27 +192,11 @@ def get_individual_holidays(df, df_fit, train_split=80, return_all=False):
     h_loc = df_fit.stan_variable("h_loc").values
     intensity = df_fit.stan_variable("intensity").values
 
-    df_bounds = (
-        holiday_list.groupby(by="HolidayName")
-        .agg({"days_behind_diff": min, "days_ahead_diff": min})
-        .reindex(
-            holiday_list.head(holiday_list.HolidayName.unique().shape[0]).HolidayName
-        )
-        .rename(
-            columns={
-                "days_behind_diff": "lower_bounds",
-                "days_ahead_diff": "upper_bounds",
-            }
-        )
-    )
-    lb = -df_bounds.lower_bounds.dt.days.values
-    ub = df_bounds.upper_bounds.dt.days.values
-
     hols_train = get_holiday_lift(
-        h_skew, h_shape, h_scale, h_loc, intensity, d_peak, lb, ub
+        h_skew, h_shape, h_scale, h_loc, intensity, d_peak, hol_mask
     )
     hols_test = get_holiday_lift(
-        h_skew, h_shape, h_scale, h_loc, intensity, d_peak_test, lb, ub
+        h_skew, h_shape, h_scale, h_loc, intensity, d_peak_test, hol_mask
     )
 
     if return_all:

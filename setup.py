@@ -2,6 +2,7 @@ from setuptools import setup, find_packages
 
 install_requires = [
     "numpy",
+    "scipy",
     "pandas",
     "matplotlib",
     "cmdstanpy",
