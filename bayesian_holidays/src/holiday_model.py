@@ -1,22 +1,44 @@
+from numpy import array
 import pandas as pd
-
+from pytrends.request import TrendReq
 from cmdstanpy import CmdStanModel
+from datetime import date, timedelta
+
 from ..src.utils import (
     create_d_peak,
     create_mask_logistic,
+    create_stan_data,
     fourier_design_matrix,
     get_holiday_dataframe,
 )
 
+ptrends = TrendReq()
+
 
 def fit_holiday_model(
-    df: pd.DataFrame,
+    search_term: str,
     start_date: str = None,
     train_split: int = 80,
     num_chains: int = 4,
     max_treedepth=10,
     adapt_delta=0.8,
 ) -> None:
+
+    today = date.today()
+    end_date_str = str(today)
+    if start_date is None:
+        start_date_str = str(today - timedelta(days=5 * 365))
+    else:
+        start_date_str = str(start_date)
+    ptrends.build_payload([search_term], timeframe=start_date_str + " " + end_date_str)
+
+    df = (
+        ptrends.interest_over_time()
+        .drop(columns=["isPartial"])
+        .reset_index()
+        .rename(columns={search_term: "observed"})
+    )
+
     df["observed"] = df["observed"].replace(["<1"], "0").astype(int)
     if start_date is None:
         start_date = df["date"].min()
@@ -62,14 +84,13 @@ def fit_holiday_model(
     )
 
     holiday_model = CmdStanModel(
-        stan_file="new_holiday_model.stan",
-        stanc_options={"O1": True},
+        stan_file="../bayesian_holidays/src/new_holiday_model.stan",
         cpp_options={"CXX": "arch -arch arm64e clang++"},
     )
 
     stan_data = create_stan_data(
-        df_train.date,
         df_train.observed,
+        num_modes_year,
         X_year,
         X_year_test,
         d_peak,
