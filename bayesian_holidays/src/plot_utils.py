@@ -1,15 +1,16 @@
-from utils import create_d_peak, create_holiday_mask, get_holiday_dataframe
+import matplotlib.pyplot as plt
+from ..src.utils import create_d_peak, create_mask_logistic, get_holiday_dataframe
 
 
 def plot_posteriors(df, df_fit, filename, plot_train=True, plot_test=True):
     alpha = df_fit.stan_variable("alpha")
     seasonality = df_fit.stan_variable("seasonality")
     holiday_effect = df_fit.stan_variable("holiday_effect")
-    log_mu = alpha.values + seasonality.values + holiday_effect.values
+    log_mu = alpha.reshape(-1, 1) + seasonality + holiday_effect
     # log_mu = df_fit.stan_variable('obs_mean');
     test_seasonality = df_fit.stan_variable("test_seasonality")
     test_holiday_effect = df_fit.stan_variable("test_holiday_effect")
-    test_log_mu = alpha.values + test_seasonality.values + test_holiday_effect.values
+    test_log_mu = alpha.reshape(-1, 1) + test_seasonality + test_holiday_effect
     # test_log_mu = df_fit.stan_variable('test_obsmean')
 
     train_date = df.date.iloc[int(0.8 * df.shape[0])]
@@ -186,21 +187,19 @@ def inv_logit(u):
     return 1.0 / (1.0 + np.exp(-u))
 
 
-def get_holiday_lift(h_skew, h_shape, h_scale, h_loc, intensity, d_peak, lb, ub):
+def get_holiday_lift(h_skew, h_shape, h_scale, h_loc, intensity, d_peak, hol_mask):
     num_holidays, num_dates = d_peak.shape
     tdd = np.zeros((h_loc.shape[0], h_loc.shape[1], d_peak[0, :].shape[0]))
 
-    for t in range(num_dates):
-        for h in range(num_holidays):
-            if (d_peak[h, t] > lb[h]) and (d_peak[h, t] < ub[h]):
-                z = (d_peak[h, t] - h_loc[:, h]) / h_scale[:, h]
-                tdd[:, h, t] += (
-                    2.0
-                    * intensity[:, h]
-                    * np.exp(-np.abs(z) ** h_shape[:, h])
-                    * inv_logit(h_skew[:, h] * z)
-                    * np.exp(-1.0 / ((ub[h] - d_peak[h, t]) * (d_peak[h, t] - lb[h])))
-                )
+    for h in range(num_holidays):
+        z = (d_peak[h, :] - h_loc[h]) / h_scale[h]
+        tdd += (
+            2.0
+            * intensity[h]
+            * np.exp(-np.abs(z) ** h_shape[h])
+            * inv_logit(h_skew[h] * z)
+            * hol_mask[h, :]
+        )
     return tdd
 
 

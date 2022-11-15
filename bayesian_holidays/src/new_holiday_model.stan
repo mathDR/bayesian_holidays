@@ -21,7 +21,7 @@ functions {
     for example, Christmas cannot persist back before Thanksgiving, nor can 
     it persist beyond New Year's Day)
   */
-  
+
   row_vector get_holiday_lift(
     vector h_skew, 
     vector h_shape,
@@ -52,17 +52,21 @@ functions {
 }
 
 data {
+  // FLAGS
+  int<lower=0,upper=1> use_seasonality;
+  int<lower=0,upper=1> use_holidays;
+
   // OBSERVATIONS
   int<lower=1> num_dates; // number of dates
   int<lower=1> num_test_dates; // number of dates
   int<lower=0> num_holidays; // number of holidays
-  int<lower=0> obs[num_dates];
+  array [num_dates] int<lower=0> obs;
 
   matrix[num_holidays, num_dates] d_peak; // distance (in time) from holiday
-  matrix[num_holidays, num_test_examples] d_peak_test; // distance (in time) from holiday
+  matrix[num_holidays, num_test_dates] d_peak_test; // distance (in time) from holiday
 
   matrix[num_holidays, num_dates] hol_mask;
-  matrix[num_holidays, num_test_examples] hol_mask_test;
+  matrix[num_holidays, num_test_dates] hol_mask_test;
 
   int<lower=0> num_modes_year;              // Number of fourier modes
   matrix[2*num_modes_year, num_dates] X_year;  // one each for cosine and sine
@@ -91,6 +95,10 @@ transformed data {
   real half_slab_df = 0.5 * slab_df; // nu/2 in regularized HS paper
   real tau0 = (expected_num_holidays / (num_holidays - expected_num_holidays)) * (1.0 / sqrt(1.0 * num_dates));
 
+  // Get the (log) data mean and (log) standard deviation for use in baseline prior
+  real log_data_mean = log(mean(obs));
+  real log_data_std = log(sd(obs));
+
 }
 
 parameters {
@@ -110,11 +118,11 @@ parameters {
 }
 
 transformed parameters {
-  row_vector[num_examples] log_obs_mean;
-  row_vector[num_examples] log_baseline;
-  row_vector[num_examples] holiday_effect;
+  row_vector[num_dates] log_obs_mean;
+  row_vector[num_dates] log_baseline;
+  row_vector[num_dates] holiday_effect;
 
-  row_vector[num_examples] seasonality;
+  row_vector[num_dates] seasonality;
 
   vector[num_holidays] h_skew;
   vector<lower=0>[num_holidays] h_shape;
@@ -130,7 +138,7 @@ transformed parameters {
     sqrt( c2 * square(lambda_m) ./ (c2 + square(tau) * square(lambda_m)) )
   );
 
-  intensity = sqrt(tau_squared) * lambda_tilde_h .* lambda_tilde;
+  intensity = tau * lambda_tilde_m .* lambda_tilde;
     
   // PRIOR REPARAMETRIZATION
   seasonality = fourier_coefficients * X_year;
@@ -170,7 +178,7 @@ model {
   profile("priors") {
     fourier_coefficients ~ std_normal();
     
-    alpha ~ beta(alpha_prior_alpha, alpha_prior_beta);
+    alpha ~ normal(log_data_mean, log_data_std);
     
     lambda_tilde ~ std_normal();
     lambda_m_unif ~ uniform(0, pi()/2);  // not necessary but pedantic
@@ -183,7 +191,7 @@ model {
   }
     
   // LIKELIHOOD
-  target += poisson_log_lupmf(obs| log_obs_mean)
+  target += poisson_log_lupmf(obs| log_obs_mean);
 }
 
 generated quantities {
@@ -191,10 +199,10 @@ generated quantities {
   row_vector[num_test_dates] test_log_obsmean;
   row_vector[num_test_dates] test_log_baseline;
   row_vector[num_test_dates] test_holiday_effect;
-
   row_vector[num_test_dates] test_seasonality;
 
-  test_baseline = rep_row_vector(alpha,num_test_dates);
+  row_vector[num_test_dates] test_baseline = rep_row_vector(alpha, num_test_dates);
+
   test_holiday_effect = get_holiday_lift(
       h_skew, h_shape, h_scale, h_loc, intensity, d_peak_test, hol_mask_test
   );

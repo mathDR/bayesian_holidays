@@ -1,7 +1,7 @@
 import pandas as pd
 
 from cmdstanpy import CmdStanModel
-from utils import (
+from ..src.utils import (
     create_d_peak,
     create_mask_logistic,
     fourier_design_matrix,
@@ -10,14 +10,13 @@ from utils import (
 
 
 def fit_holiday_model(
-    filename: str,
+    df: pd.DataFrame,
     start_date: str = None,
     train_split: int = 80,
     num_chains: int = 4,
     max_treedepth=10,
     adapt_delta=0.8,
-):
-    df = pd.read_csv(filename, header=1, names=["date", "observed"], parse_dates=[0])
+) -> None:
     df["observed"] = df["observed"].replace(["<1"], "0").astype(int)
     if start_date is None:
         start_date = df["date"].min()
