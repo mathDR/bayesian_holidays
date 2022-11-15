@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import expit
+from scipy.special import expit
 import pandas as pd
 from typing import Dict, List
 
@@ -70,11 +70,8 @@ class USHolidays(holidays.UnitedStates):
         # Remove Washingtons Birthday
         self.pop_named("Washington's Birthday")
 
-        # Remove Memorial Day
-        self.pop_named("Memorial Day")
-
-        # Add Presidents Day -- 3rd monday in Februray
-        self[date(year, FEB, 1) + rd(weekday=MO(+3))] = "Presidents Day"
+        # Add Valentine's Day -- Februray 14
+        self[date(year, FEB, 14)] = "Valentine's Day"
 
         # Add Easter
         self[easter(year)] = "Easter"

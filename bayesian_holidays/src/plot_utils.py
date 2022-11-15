@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from pandas import offsets, to_datetime
-from numpy import abs, exp, expand_dims, mean
+from numpy import abs, exp, expand_dims, mean, sum
 from scipy.special import expit
 from ..src.utils import create_d_peak, create_mask_logistic, get_holiday_dataframe
 
@@ -152,19 +152,24 @@ def plot_components(
     return None
 
 
-def get_holiday_lift(h_skew, h_shape, h_scale, h_loc, intensity, d_peak, hol_mask):
-    z = (expand_dims(d_peak_test, axis=0) - expand_dims(h_loc, axis=2)) / expand_dims(
+def get_holiday_lift(
+    h_skew, h_shape, h_scale, h_loc, intensity, d_peak, hol_mask, return_sum=True
+):
+    z = (expand_dims(d_peak, axis=0) - expand_dims(h_loc, axis=2)) / expand_dims(
         h_scale, axis=2
     )
-    tdd = np.sum(
+    tdd = (
         2.0
         * expand_dims(intensity, axis=2)
         * exp(-abs(z) ** expand_dims(h_shape, axis=2))
         * expit(expand_dims(h_skew, axis=2) * z)
         * expand_dims(hol_mask, axis=0),
-        axis=1,
     )
-    return tdd
+
+    if return_sum:
+        return sum(tdd, axis=1)
+    else:
+        return tdd[0]
 
 
 def get_individual_holidays(df, df_fit, train_split=80, return_all=False):
@@ -188,17 +193,27 @@ def get_individual_holidays(df, df_fit, train_split=80, return_all=False):
     d_peak = create_d_peak(df_train.date, holiday_list)
     d_peak_test = create_d_peak(df_test.date, holiday_list)
 
-    h_skew = df_fit.stan_variable("h_skew").values
-    h_shape = df_fit.stan_variable("h_shape").values
-    h_scale = df_fit.stan_variable("h_scale").values
-    h_loc = df_fit.stan_variable("h_loc").values
-    intensity = df_fit.stan_variable("intensity").values
+    hol_mask = create_mask_logistic(df_train.date, holiday_list)
+    hol_mask_test = create_mask_logistic(df_test.date, holiday_list)
+
+    h_skew = df_fit.stan_variable("h_skew")
+    h_shape = df_fit.stan_variable("h_shape")
+    h_scale = df_fit.stan_variable("h_scale")
+    h_loc = df_fit.stan_variable("h_loc")
+    intensity = df_fit.stan_variable("intensity")
 
     hols_train = get_holiday_lift(
-        h_skew, h_shape, h_scale, h_loc, intensity, d_peak, hol_mask
+        h_skew, h_shape, h_scale, h_loc, intensity, d_peak, hol_mask, return_sum=False
     )
     hols_test = get_holiday_lift(
-        h_skew, h_shape, h_scale, h_loc, intensity, d_peak_test, hol_mask
+        h_skew,
+        h_shape,
+        h_scale,
+        h_loc,
+        intensity,
+        d_peak_test,
+        hol_mask_test,
+        return_sum=False,
     )
 
     if return_all:
@@ -222,6 +237,6 @@ def plot_individual_holidays(times, tdd, hol_names):
     for h in range(tdd.shape[1]):
         for j in range(tdd.shape[0]):
             plt.plot(times, tdd[j, h, :], color="orange", alpha=0.1)
-        plt.plot(times, np.mean(tdd[:, h, :], axis=0), color="firebrick", lw=2)
+        plt.plot(times, mean(tdd[:, h, :], axis=0), color="firebrick", lw=2)
         plt.title(hol_names[h])
         plt.show()
