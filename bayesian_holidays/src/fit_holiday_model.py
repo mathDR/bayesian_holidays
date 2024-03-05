@@ -1,10 +1,9 @@
 from numpy import array
 import pandas as pd
-from pytrends.request import TrendReq
 from cmdstanpy import CmdStanModel
 from datetime import date, timedelta
 
-from utils import (
+from .utils import (
     create_d_peak,
     create_mask_logistic,
     create_stan_data,
@@ -12,31 +11,26 @@ from utils import (
     get_holiday_dataframe,
 )
 
-pytrends = TrendReq(hl="en-US", tz=360)
-
 
 def fit_holiday_model(
     search_term: str,
+    geo="US",
     start_date: str = None,
     train_split: int = 80,
     num_chains: int = 4,
     max_treedepth=10,
     adapt_delta=0.8,
 ) -> None:
-    today = date.today()
-    end_date_str = str(today)
-    if start_date is None:
-        start_date_str = str(today - timedelta(days=5 * 365))
+    assert search_term in ["chocolate", "ramadan"]
+    if search_term == "chocolate":
+        df = pd.read_csv("../bayesian_holidays/src/data/us_chocolate.csv")
+        df = df.rename(columns={"Chocolate": "observed"})
+        country = "UnitedStates"
     else:
-        start_date_str = str(start_date)
-    pytrends.build_payload([search_term], timeframe=start_date_str + " " + end_date_str)
-
-    df = (
-        pytrends.interest_over_time()
-        .drop(columns=["isPartial"])
-        .reset_index()
-        .rename(columns={search_term: "observed"})
-    )
+        df = pd.read_csv("../bayesian_holidays/src/data/bangladesh_ramadan.csv")
+        df = df.rename(columns={"ramadan": "observed"})
+        country = "Bangladesh"
+    df["date"] = pd.to_datetime(df["Week"])
 
     df["observed"] = df["observed"].replace(["<1"], "0").astype(int)
     if start_date is None:
@@ -51,7 +45,7 @@ def fit_holiday_model(
         range(pd.to_datetime(start_date).year - 1, pd.to_datetime(end_date).year + 1)
     )
     holiday_list = (
-        get_holiday_dataframe(years=holiday_years)
+        get_holiday_dataframe(years=holiday_years, country=country)
         .sort_values(by="HolidayDate")
         .reset_index()
     )
@@ -102,8 +96,8 @@ def fit_holiday_model(
     holiday_fit = holiday_model.sample(
         inits=holiday_pathfinder.create_inits(),
         chains=num_chains,
-        iter_warmup=250,
-        iter_sampling=250,
+        iter_warmup=1000,
+        iter_sampling=1000,
         data=stan_data,
         max_treedepth=max_treedepth,
         adapt_delta=adapt_delta,

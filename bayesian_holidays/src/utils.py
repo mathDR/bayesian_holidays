@@ -10,7 +10,7 @@ from dateutil.relativedelta import relativedelta as rd, MO, SU, FR
 
 from holidays.constants import JAN, FEB, MAR, APR, MAY, JUN, JUL, AUG, SEP
 from holidays.constants import OCT, NOV, DEC
-from holidays.countries import UnitedStates
+from holidays.countries import Bangladesh, UnitedStates
 
 LOG2 = 0.6931471805599453
 
@@ -109,6 +109,12 @@ class USHolidays(UnitedStates):
             pass
 
 
+class BangladeshHolidays(Bangladesh):
+    def _populate(self, year):
+        # Populate the holiday list with the default US holidays
+        Bangladesh._populate(self, year)
+
+
 def fourier_design_matrix(
     times: np.ndarray, period: float = 365.25, num_modes: int = 1
 ):
@@ -201,17 +207,30 @@ def create_d_peak(times: np.ndarray, holiday_list: pd.DataFrame):
     return np.asarray(d_peak) / 7.0
 
 
-def get_holiday_dataframe(years: List[int]):
-    df_holiday = (
-        pd.DataFrame.from_dict(
-            USHolidays(years=years, observed=False),
-            orient="index",
-            columns=["HolidayName"],
+def get_holiday_dataframe(years: List[int], country: str):
+    assert country in ["UnitedStates", "Bangladesh"]
+    if country == "UnitedStates":
+        df_holiday = (
+            pd.DataFrame.from_dict(
+                USHolidays(years=years, observed=False),
+                orient="index",
+                columns=["HolidayName"],
+            )
+            .reset_index()
+            .rename(columns={"index": "HolidayDate"})
+            .sort_values(by=["HolidayDate"])
         )
-        .reset_index()
-        .rename(columns={"index": "HolidayDate"})
-        .sort_values(by=["HolidayDate"])
-    )
+    else:
+        df_holiday = (
+            pd.DataFrame.from_dict(
+                BangladeshHolidays(years=years, observed=False),
+                orient="index",
+                columns=["HolidayName"],
+            )
+            .reset_index()
+            .rename(columns={"index": "HolidayDate"})
+            .sort_values(by=["HolidayDate"])
+        )
 
     df_holiday["HolidayDate"] = pd.to_datetime(df_holiday["HolidayDate"])
     z = dict(
