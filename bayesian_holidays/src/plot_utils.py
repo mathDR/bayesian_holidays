@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from pandas import offsets, to_datetime
-from numpy import abs, exp, expand_dims, mean, sum
+from numpy import exp, expand_dims, mean, square, sum
 from scipy.special import expit
 from ..src.utils import create_d_peak, create_mask_logistic, get_holiday_dataframe
 
@@ -155,13 +155,15 @@ def plot_components(
 def get_holiday_lift(
     h_skew, h_shape, h_scale, h_loc, intensity, d_peak, hol_mask, return_sum=True
 ):
+    # z = (t - loc) / scale
     z = (expand_dims(d_peak, axis=0) - expand_dims(h_loc, axis=2)) / expand_dims(
         h_scale, axis=2
     )
+    # tdd = intensity * exp(-square(z)** shape) * expit(z* skew) * mask
     tdd = (
         2.0
         * expand_dims(intensity, axis=2)
-        * exp(-abs(z) ** expand_dims(h_shape, axis=2))
+        * exp(-square(z) ** expand_dims(h_shape, axis=2))
         * expit(expand_dims(h_skew, axis=2) * z)
         * expand_dims(hol_mask, axis=0),
     )

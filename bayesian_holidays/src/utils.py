@@ -10,6 +10,7 @@ from dateutil.relativedelta import relativedelta as rd, MO, SU, FR
 
 from holidays.constants import JAN, FEB, MAR, APR, MAY, JUN, JUL, AUG, SEP
 from holidays.constants import OCT, NOV, DEC
+from holidays.countries import UnitedStates
 
 LOG2 = 0.6931471805599453
 
@@ -26,7 +27,6 @@ def create_stan_data(
     use_seasonality: int = 1,
     use_holidays: int = 1,
 ) -> Dict:
-
     num_holidays, num_dates = d_peak.shape
     _, num_test_dates = d_peak_test.shape
     stan_data = {
@@ -62,16 +62,27 @@ def create_stan_data(
     return stan_data
 
 
-class USHolidays(holidays.UnitedStates):
+class USHolidays(UnitedStates):
     def _populate(self, year):
         # Populate the holiday list with the default US holidays
-        holidays.UnitedStates._populate(self, year)
+        UnitedStates._populate(self, year)
 
         # Remove Washingtons Birthday
-        self.pop_named("Washington's Birthday")
+        try:
+            self.pop_named("Washington's Birthday")
+        except KeyError as e:
+            pass
+        # Remove Memorial Day
+        try:
+            self.pop_named("Memorial Day")
+        except KeyError as e:
+            pass
 
-        # Add Valentine's Day -- Februray 14
-        self[date(year, FEB, 14)] = "Valentine's Day"
+        # Add Presidents Day -- 3rd monday in Februray
+        try:
+            self[date(year, FEB, 1) + rd(weekday=MO(+3))] = "Presidents Day"
+        except KeyError as e:
+            pass
 
         # Add Easter
         self[easter(year)] = "Easter"
@@ -80,10 +91,11 @@ class USHolidays(holidays.UnitedStates):
         self[date(year, MAY, 1) + rd(weekday=SU(+2))] = "Mothers Day"
 
         # remove Juneteenth
-        # self.pop_named("Juneteenth National Independence Day")
         if year > 2020:
-            self.pop(date(year, JUN, 19))
-
+            try:
+                self.pop(date(year, JUN, 19))
+            except KeyError as e:
+                pass
         # Add Fathers Day -- 3rd sunday in june
         self[date(year, JUN, 1) + rd(weekday=SU(+3))] = "Fathers Day"
 
@@ -91,7 +103,10 @@ class USHolidays(holidays.UnitedStates):
         self[date(year, OCT, 31)] = "Halloween"
 
         # Remove Veterans/Armistice Day
-        self.pop_named("Veterans Day")
+        try:
+            self.pop_named("Veterans Day")
+        except KeyError as e:
+            pass
 
 
 def fourier_design_matrix(
@@ -151,7 +166,10 @@ def create_mask_logistic(times: np.ndarray, holiday_list: pd.DataFrame):
             xL = times[ind] - pd.to_timedelta(series.days_behind_diff, unit="d")
             xU = times[ind] + pd.to_timedelta(series.days_ahead_diff, unit="d")
             alpha = LOG2 / (0.01 * (xU - xL).dt.days)
-            mask_array[series.HolidayId - 1, ind,] = expit(
+            mask_array[
+                series.HolidayId - 1,
+                ind,
+            ] = expit(
                 alpha * ((times[ind] - xL)).dt.days.values
             ) * expit(-alpha * ((times[ind] - xU)).dt.days.values)
 
@@ -184,7 +202,6 @@ def create_d_peak(times: np.ndarray, holiday_list: pd.DataFrame):
 
 
 def get_holiday_dataframe(years: List[int]):
-
     df_holiday = (
         pd.DataFrame.from_dict(
             USHolidays(years=years, observed=False),

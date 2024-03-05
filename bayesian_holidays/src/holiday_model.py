@@ -12,7 +12,7 @@ from ..src.utils import (
     get_holiday_dataframe,
 )
 
-ptrends = TrendReq()
+pytrends = TrendReq(hl="en-US", tz=360)
 
 
 def fit_holiday_model(
@@ -23,17 +23,16 @@ def fit_holiday_model(
     max_treedepth=10,
     adapt_delta=0.8,
 ) -> None:
-
     today = date.today()
     end_date_str = str(today)
     if start_date is None:
         start_date_str = str(today - timedelta(days=5 * 365))
     else:
         start_date_str = str(start_date)
-    ptrends.build_payload([search_term], timeframe=start_date_str + " " + end_date_str)
+    pytrends.build_payload([search_term], timeframe=start_date_str + " " + end_date_str)
 
     df = (
-        ptrends.interest_over_time()
+        pytrends.interest_over_time()
         .drop(columns=["isPartial"])
         .reset_index()
         .rename(columns={search_term: "observed"})
@@ -84,8 +83,7 @@ def fit_holiday_model(
     )
 
     holiday_model = CmdStanModel(
-        stan_file="../bayesian_holidays/src/new_holiday_model.stan",
-        cpp_options={"CXX": "arch -arch arm64e clang++"},
+        stan_file="../bayesian_holidays/src/new_holiday_model.stan"
     )
 
     stan_data = create_stan_data(
@@ -99,7 +97,10 @@ def fit_holiday_model(
         hol_mask_test,
     )
 
+    holiday_pathfinder = holiday_model.pathfinder(inits=0, data=stan_data, seed=42)
+
     holiday_fit = holiday_model.sample(
+        inits=holiday_pathfinder.create_inits(),
         chains=num_chains,
         iter_warmup=250,
         iter_sampling=250,

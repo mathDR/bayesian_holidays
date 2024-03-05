@@ -2,7 +2,7 @@ functions {
   /*
     Our holiday effect function: get_holiday_lift describes the 
     effect of the holiday at date t as:
-      h(t) = 2*lambda * exp(−|z(t)|^h_shape) / (1+exp(−h_skew * z(t))
+      h(t) = 2*lambda * exp(−square(z(t))^h_shape) / (1+exp(−h_skew * z(t))
     with
       z(t) = (t−h_loc) / h_scale
     where
@@ -20,6 +20,9 @@ functions {
     within a time window between the previous holiday and the next holiday.  (So
     for example, Christmas cannot persist back before Thanksgiving, nor can 
     it persist beyond New Year's Day)
+
+    We originally had the shape term to be -|z(t)|^h_shape, but that discontinuity led to 
+    poor sampling times (and mixing) and the loss of peaked-ness using the square() seems fine.
   */
 
   row_vector get_holiday_lift(
@@ -40,7 +43,7 @@ functions {
     
     for (h in 1:num_holidays) {
       z = (d_peak[h, :] - h_loc[h]) ./ h_scale[h];
-      tdd += (2.0 * intensity[h] * exp(-abs(z) .^ h_shape[h]) .* 
+      tdd += (2.0 * intensity[h] * exp(-square(z) .^ h_shape[h]) .* 
         inv_logit(h_skew[h] * z)
         ) .* hol_mask[h,:];
     }
@@ -178,7 +181,7 @@ model {
   profile("priors") {
     fourier_coefficients ~ std_normal();
     
-    alpha ~ normal(log_data_mean, log_data_std);
+    alpha ~ std_normal();
     
     lambda_tilde ~ std_normal();
     lambda_m_unif ~ uniform(0, pi()/2);  // not necessary but pedantic
