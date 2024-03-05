@@ -2,7 +2,7 @@ functions {
   /*
     Our holiday effect function: get_holiday_lift describes the 
     effect of the holiday at date t as:
-      h(t) = 2*lambda * exp(−square(z(t))^h_shape) / (1+exp(−h_skew * z(t))
+      h(t) = 2*lambda * exp(−|z(t)|^h_shape) / (1+exp(−h_skew * z(t))
     with
       z(t) = (t−h_loc) / h_scale
     where
@@ -16,6 +16,7 @@ functions {
       holiday effect is around h_loc
     * lambda is the intensity parameter - this denotes the magnitude of
       the holiday effect.
+
     The model is then "masked" so that the effect of any holiday can only persist
     within a time window between the previous holiday and the next holiday.  (So
     for example, Christmas cannot persist back before Thanksgiving, nor can 
@@ -24,7 +25,7 @@ functions {
     We originally had the shape term to be -|z(t)|^h_shape, but that discontinuity led to 
     poor sampling times (and mixing) and the loss of peaked-ness using the square() seems fine.
   */
-
+  
   row_vector get_holiday_lift(
     vector h_skew, 
     vector h_shape,
@@ -43,7 +44,7 @@ functions {
     
     for (h in 1:num_holidays) {
       z = (d_peak[h, :] - h_loc[h]) ./ h_scale[h];
-      tdd += (2.0 * intensity[h] * exp(-square(z) .^ h_shape[h]) .* 
+      tdd += (2.0 * intensity[h] * exp(-pow(square(z),h_shape[h])) .* 
         inv_logit(h_skew[h] * z)
         ) .* hol_mask[h,:];
     }
@@ -55,10 +56,6 @@ functions {
 }
 
 data {
-  // FLAGS
-  int<lower=0,upper=1> use_seasonality;
-  int<lower=0,upper=1> use_holidays;
-
   // OBSERVATIONS
   int<lower=1> num_dates; // number of dates
   int<lower=1> num_test_dates; // number of dates
@@ -90,6 +87,17 @@ data {
 }
 
 transformed data {
+  real expected_num_holidays = 3.0;  // Expected number of activated holidays
+  real slab_scale = 2.0;    // Scale for large slopes
+  real slab_scale2 = square(slab_scale);
+  real slab_df = 25.0;      // Effective degrees of freedom for large slopes
+  real half_slab_df = 0.5 * slab_df;
+
+  real tau0 = (expected_num_holidays / (num_holidays - expected_num_holidays)) * (1.0 / sqrt(1.0 * num_dates));
+
+}
+
+transformed data {
   // HOLIDAY Prior parameters
   real expected_num_holidays = 3.0; // Expected number of activated holidays
   real slab_scale = 2.0;    // Scale for large slopes - s parameter in HS paper
@@ -98,15 +106,13 @@ transformed data {
   real half_slab_df = 0.5 * slab_df; // nu/2 in regularized HS paper
   real tau0 = (expected_num_holidays / (num_holidays - expected_num_holidays)) * (1.0 / sqrt(1.0 * num_dates));
 
-  // Get the (log) data mean and (log) standard deviation for use in baseline prior
-  real log_data_mean = log(mean(obs));
-  real log_data_std = log(sd(obs));
-
 }
 
 parameters {
-  real alpha;
+  // Baseline
+  real log_baseline_real;
 
+  // Seasonality
   row_vector[2*num_modes_year] fourier_coefficients;
   
   // Holiday Parameters  
@@ -122,10 +128,10 @@ parameters {
 
 transformed parameters {
   row_vector[num_dates] log_obs_mean;
-  row_vector[num_dates] log_baseline;
-  row_vector[num_dates] holiday_effect;
 
-  row_vector[num_dates] seasonality;
+  row_vector[num_dates] log_baseline;
+  row_vector[num_dates] log_seasonality;
+  row_vector[num_dates] holiday_effect;
 
   vector[num_holidays] h_skew;
   vector<lower=0>[num_holidays] h_shape;
@@ -144,7 +150,7 @@ transformed parameters {
   intensity = tau * lambda_tilde_m .* lambda_tilde;
     
   // PRIOR REPARAMETRIZATION
-  seasonality = fourier_coefficients * X_year;
+  log_seasonality = fourier_coefficients * X_year;
 
   intensity = tau * lambda_tilde_m .* lambda_tilde;
   h_loc = h_loc_prior_mu + h_loc_prior_sig .* h_locZ;
@@ -158,20 +164,8 @@ transformed parameters {
     );
   }
 
-  log_baseline = rep_row_vector(alpha, num_dates);
-  if (use_holidays) {
-    if (use_seasonality) {
-      log_obs_mean = (log_baseline + holiday_effect + seasonality);
-    }
-    else {
-      log_obs_mean = (log_baseline + holiday_effect);
-    }
-  } else if (use_seasonality) {
-    log_obs_mean = (log_baseline + seasonality);
-  }
-  else {
-    log_obs_mean = log_baseline;
-  }
+  log_baseline = rep_row_vector(log_baseline_real, num_dates);
+  log_obs_mean = (log_baseline + holiday_effect + log_seasonality);
     
 }
 
@@ -181,7 +175,7 @@ model {
   profile("priors") {
     fourier_coefficients ~ std_normal();
     
-    alpha ~ std_normal();
+    log_baseline_real ~ std_normal();
     
     lambda_tilde ~ std_normal();
     lambda_m_unif ~ uniform(0, pi()/2);  // not necessary but pedantic
@@ -200,33 +194,16 @@ model {
 generated quantities {
   row_vector[num_test_dates] test_obs;
   row_vector[num_test_dates] test_log_obsmean;
-  row_vector[num_test_dates] test_log_baseline;
+  row_vector[num_test_dates] test_log_baseline = rep_row_vector(log_baseline_real, num_test_dates);
   row_vector[num_test_dates] test_holiday_effect;
-  row_vector[num_test_dates] test_seasonality;
+  row_vector[num_test_dates] test_log_seasonality = fourier_coefficients * X_year_test;
 
-  row_vector[num_test_dates] test_baseline;
-
-  test_log_baseline = rep_row_vector(alpha, num_test_dates);
   test_holiday_effect = get_holiday_lift(
       h_skew, h_shape, h_scale, h_loc, intensity, d_peak_test, hol_mask_test
   );
-  test_seasonality = fourier_coefficients * X_year_test;
 
-  if (use_holidays) {
-    if (use_seasonality) {
-      test_log_obsmean = (test_log_baseline + test_holiday_effect + test_seasonality);
-    }
-    else {
-      test_log_obsmean = (test_log_baseline + test_holiday_effect);
-    }
-  } else if (use_seasonality) {
-    test_log_obsmean = (test_log_baseline + test_seasonality);
-  }
-  else {
-    test_log_obsmean = test_log_baseline;
-  }
+  test_log_obsmean = (test_log_baseline + test_holiday_effect + test_seasonality);
   
-  for(n in 1:num_test_dates) {
-    test_obs[n] = poisson_log_rng(test_log_obsmean[n]);
-  }
+  test_obs = poisson_log_rng(test_log_obsmean);
+
 }
