@@ -4,7 +4,7 @@ from pytrends.request import TrendReq
 from cmdstanpy import CmdStanModel
 from datetime import date, timedelta
 
-from ..src.utils import (
+from utils import (
     create_d_peak,
     create_mask_logistic,
     create_stan_data,
@@ -83,7 +83,7 @@ def fit_holiday_model(
     )
 
     holiday_model = CmdStanModel(
-        stan_file="../bayesian_holidays/src/new_holiday_model.stan"
+        stan_file="../bayesian_holidays/src/holiday_model.stan"
     )
 
     stan_data = create_stan_data(
