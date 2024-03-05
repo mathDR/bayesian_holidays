@@ -6,12 +6,12 @@ from ..src.utils import create_d_peak, create_mask_logistic, get_holiday_datafra
 
 
 def plot_posteriors(df, df_fit, name=None, plot_train=True, plot_test=True):
-    alpha = df_fit.stan_variable("alpha")
-    seasonality = df_fit.stan_variable("seasonality")
+    alpha = df_fit.stan_variable("log_baseline_real")
+    seasonality = df_fit.stan_variable("log_seasonality")
     holiday_effect = df_fit.stan_variable("holiday_effect")
     log_mu = alpha.reshape(-1, 1) + seasonality + holiday_effect
 
-    test_seasonality = df_fit.stan_variable("test_seasonality")
+    test_seasonality = df_fit.stan_variable("test_log_seasonality")
     test_holiday_effect = df_fit.stan_variable("test_holiday_effect")
     test_log_mu = alpha.reshape(-1, 1) + test_seasonality + test_holiday_effect
 
@@ -73,12 +73,12 @@ def plot_posteriors(df, df_fit, name=None, plot_train=True, plot_test=True):
 def plot_components(
     df, df_fit, name=None, start_date="2016-01-01", plot_train=True, plot_test=True
 ):
-    baseline = df_fit.stan_variable("baseline")
-    seasonality = df_fit.stan_variable("seasonality")
+    log_baseline = df_fit.stan_variable("log_baseline")
+    log_seasonality = df_fit.stan_variable("log_seasonality")
     holiday_effect = df_fit.stan_variable("holiday_effect")
 
-    test_baseline = df_fit.stan_variable("test_baseline")
-    test_seasonality = df_fit.stan_variable("test_seasonality")
+    test_log_baseline = df_fit.stan_variable("test_log_baseline")
+    test_log_seasonality = df_fit.stan_variable("test_log_seasonality")
     test_holiday_effect = df_fit.stan_variable("test_holiday_effect")
 
     train_date = df.date.iloc[int(0.8 * df.shape[0])]
@@ -88,10 +88,10 @@ def plot_components(
 
     fig, ax = plt.subplots(figsize=(18, 12))
     if plot_train:
-        p = ax.plot(df_train.date, exp(seasonality[0, :]), alpha=0.05)
+        p = ax.plot(df_train.date, exp(log_seasonality[0, :]), alpha=0.05)
         clr = p[0].get_color()
         for i in range(1, seasonality.shape[0]):
-            ax.plot(df_train.date, exp(seasonality[i, :]), color=clr, alpha=0.05)
+            ax.plot(df_train.date, exp(log_seasonality[i, :]), color=clr, alpha=0.05)
         ax.plot(
             df_train.date,
             exp(mean(seasonality, axis=0)),
@@ -107,10 +107,12 @@ def plot_components(
             label="Mean of Posterior Holiday Effect",
         )
     if plot_test:
-        p = ax.plot(df_test.date, exp(test_seasonality[0, :]), alpha=0.05)
+        p = ax.plot(df_test.date, exp(test_log_seasonality[0, :]), alpha=0.05)
         clr = p[0].get_color()
         for i in range(1, test_seasonality.shape[0]):
-            ax.plot(df_test.date, exp(test_seasonality[i, :]), color=clr, alpha=0.05)
+            ax.plot(
+                df_test.date, exp(test_log_seasonality[i, :]), color=clr, alpha=0.05
+            )
         ax.plot(
             df_test.date,
             exp(mean(test_seasonality, axis=0)),
@@ -174,7 +176,7 @@ def get_holiday_lift(
         return tdd[0]
 
 
-def get_individual_holidays(df, df_fit, train_split=80, return_all=False):
+def get_individual_holidays(df, df_fit, country=None, train_split=80, return_all=False):
     start_date = df["date"].min()
     end_date = df["date"].max()
 
@@ -182,7 +184,7 @@ def get_individual_holidays(df, df_fit, train_split=80, return_all=False):
         range(to_datetime(start_date).year - 1, to_datetime(end_date).year + 1)
     )
     holiday_list = (
-        get_holiday_dataframe(years=holiday_years)
+        get_holiday_dataframe(years=holiday_years, country=country)
         .sort_values(by="HolidayDate")
         .reset_index()
     )

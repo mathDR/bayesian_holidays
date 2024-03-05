@@ -56,6 +56,7 @@ functions {
 }
 
 data {
+
   // OBSERVATIONS
   int<lower=1> num_dates; // number of dates
   int<lower=1> num_test_dates; // number of dates
@@ -93,17 +94,6 @@ transformed data {
   real slab_df = 25.0;      // Effective degrees of freedom for large slopes
   real half_slab_df = 0.5 * slab_df;
 
-  real tau0 = (expected_num_holidays / (num_holidays - expected_num_holidays)) * (1.0 / sqrt(1.0 * num_dates));
-
-}
-
-transformed data {
-  // HOLIDAY Prior parameters
-  real expected_num_holidays = 3.0; // Expected number of activated holidays
-  real slab_scale = 2.0;    // Scale for large slopes - s parameter in HS paper
-  real slab_scale2 = square(slab_scale); // s^2 in HS paper
-  real slab_df = 25.0;      // Effective degrees of freedom for large slopes - nu in HS paper
-  real half_slab_df = 0.5 * slab_df; // nu/2 in regularized HS paper
   real tau0 = (expected_num_holidays / (num_holidays - expected_num_holidays)) * (1.0 / sqrt(1.0 * num_dates));
 
 }
@@ -192,7 +182,7 @@ model {
 }
 
 generated quantities {
-  row_vector[num_test_dates] test_obs;
+  array[num_test_dates] int test_obs;
   row_vector[num_test_dates] test_log_obsmean;
   row_vector[num_test_dates] test_log_baseline = rep_row_vector(log_baseline_real, num_test_dates);
   row_vector[num_test_dates] test_holiday_effect;
@@ -202,7 +192,7 @@ generated quantities {
       h_skew, h_shape, h_scale, h_loc, intensity, d_peak_test, hol_mask_test
   );
 
-  test_log_obsmean = (test_log_baseline + test_holiday_effect + test_seasonality);
+  test_log_obsmean = (test_log_baseline + test_holiday_effect + test_log_seasonality);
   
   test_obs = poisson_log_rng(test_log_obsmean);
 
