@@ -21,7 +21,10 @@ def fit_holiday_model(
     max_treedepth=10,
     adapt_delta=0.8,
 ) -> None:
-    assert search_term in ["chocolate", "ramadan"]
+    assert search_term in [
+        "chocolate",
+        "ramadan",
+    ], f"Search term {search_term} not supported. Only ramadan and chocolate are supported."
     if search_term == "chocolate":
         df = pd.read_csv("../bayesian_holidays/src/data/us_chocolate.csv")
         df = df.rename(columns={"Chocolate": "observed"})
@@ -78,8 +81,6 @@ def fit_holiday_model(
 
     holiday_model = CmdStanModel(
         stan_file="../bayesian_holidays/src/holiday_model.stan",
-        user_header="../bayesian_holidays/src/get_holiday_lift.hpp",
-        stanc_options={"allow-undefined": True},
     )
 
     stan_data = create_stan_data(
@@ -93,7 +94,7 @@ def fit_holiday_model(
         hol_mask_test,
     )
 
-    holiday_pathfinder = holiday_model.pathfinder(inits=0, data=stan_data, seed=42)
+    holiday_pathfinder = holiday_model.pathfinder(data=stan_data, seed=42)
 
     holiday_fit = holiday_model.sample(
         inits=holiday_pathfinder.create_inits(),
