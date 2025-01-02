@@ -77,7 +77,9 @@ def fit_holiday_model(
     )
 
     holiday_model = CmdStanModel(
-        stan_file="../bayesian_holidays/src/holiday_model.stan"
+        stan_file="../bayesian_holidays/src/holiday_model.stan",
+        user_header="../bayesian_holidays/src/get_holiday_lift.hpp",
+        stanc_options={"allow-undefined": True},
     )
 
     stan_data = create_stan_data(
