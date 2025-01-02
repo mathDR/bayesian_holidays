@@ -2,7 +2,7 @@ functions {
   /*
     Our holiday effect function: get_holiday_lift describes the 
     effect of the holiday at date t as:
-      h(t) = 2*lambda * exp(−|z(t)|^h_shape) / (1+exp(−h_skew * z(t))
+      h(t) = 2*lambda * exp(−(z(t)^2)^h_shape) / (1+exp(−h_skew * z(t))
     with
       z(t) = (t−h_loc) / h_scale
     where
@@ -34,8 +34,8 @@ functions {
     vector intensity,
     matrix d_peak,
     matrix hol_mask
-    );
-  /*{
+    )
+  {
     int num_holidays = dims(d_peak)[1];
     int num_dates = dims(d_peak)[2];
 
@@ -51,7 +51,7 @@ functions {
 
     return tdd;
 
-  }*/
+  }
 
 }
 
