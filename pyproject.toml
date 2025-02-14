@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bayesian_holidays"
+version = "0.1"
+authors = [{name = "Daniel Marthaler", email = "dan.marthaler@gmail.com"}]
+description="Bayesian Holiday Model for Time Series"
+readme = "README.md"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "matplotlib",
+    "cmdstanpy",
+    "holidays",
+    "pytrends",
+]
+[project.optional-dependencies]
+tests = ["pytest"]
+
