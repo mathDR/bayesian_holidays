@@ -8,6 +8,7 @@ version = "0.1"
 authors = [{name = "Daniel Marthaler", email = "dan.marthaler@gmail.com"}]
 description="Bayesian Holiday Model for Time Series"
 readme = "README.md"
+license = {file="LICENSE"}
 dependencies = [
     "numpy",
     "scipy",
