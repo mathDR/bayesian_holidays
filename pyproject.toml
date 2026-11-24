@@ -2,13 +2,17 @@
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.package-data]
+bayesian_holidays = ["py.typed", "*.stan", "data/*.csv"]
+
 [project]
 name = "bayesian_holidays"
-version = "0.1"
+version = "0.1.0"
+requires-python = ">=3.12"
 authors = [{name = "Daniel Marthaler", email = "dan.marthaler@gmail.com"}]
-description="Bayesian Holiday Model for Time Series"
+description = "Bayesian Holiday Model for Time Series"
 readme = "README.md"
-license = {file="LICENSE"}
+license = {file = "LICENSE"}
 dependencies = [
     "numpy",
     "scipy",
@@ -17,7 +21,86 @@ dependencies = [
     "cmdstanpy",
     "holidays",
     "pytrends",
+    "jupyter>=1.1.1",
+    "notebook>=7.6.4",
 ]
+
 [project.optional-dependencies]
 tests = ["pytest"]
 
+[dependency-groups]
+dev = [
+    "mypy>=2.4.1",
+    "pandas-stubs>=3.1.0.261029",
+    "pytest>=8.0.0",
+    "ruff>=0.9.0",
+    "scipy-stubs>=1.18.1.1",
+    "types-python-dateutil>=2.9.0.20261122",
+]
+
+# ---------------------------------------------------------------------------
+# Ruff Configuration (Linter + Formatter)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort (import sorting)
+    "UP",     # pyupgrade (modern Python 3.12+ syntax)
+    "B",      # flake8-bugbear (common bug patterns)
+    "SIM",    # flake8-simplify
+    "NPY",    # NumPy-specific rules
+    "PD",     # pandas-vet
+    "RUF",    # Ruff-specific rules
+]
+ignore = [
+    "E501",   # Line length handled by `ruff format`
+    "RUF001", # Allow intentional Greek math symbols (e.g., α) in plot labels
+]
+
+[tool.ruff.lint.per-file-ignores]
+"notebooks/*" = ["E402", "SIM108"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["bayesian_holidays"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+# ---------------------------------------------------------------------------
+# Mypy Configuration
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+mypy_path = ["src"]
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+    "holidays.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: marks tests that compile and sample the Stan model",
+]
+filterwarnings = [
+    "error",
+]

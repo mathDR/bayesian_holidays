@@ -1,9 +1,15 @@
-from numpy import array
-import pandas as pd
-from cmdstanpy import CmdStanModel
-from datetime import date, timedelta
+"""Fitting a Holiday model to data."""
 
-from .utils import (
+from collections.abc import Mapping
+from importlib.resources import as_file, files
+from pathlib import Path
+from typing import Any, cast
+
+import numpy as np
+import pandas as pd
+from cmdstanpy import CmdStanMCMC, CmdStanModel
+
+from bayesian_holidays.utils import (
     create_d_peak,
     create_mask_logistic,
     create_stan_data,
@@ -11,100 +17,134 @@ from .utils import (
     get_holiday_dataframe,
 )
 
+# Registry mapping search terms to packaged CSV filenames, target columns, and countries
+DATASET_CONFIG: dict[str, tuple[str, str, str]] = {
+    "chocolate": ("us_chocolate.csv", "Chocolate", "UnitedStates"),
+    "ramadan": ("bangladesh_ramadan.csv", "ramadan", "Bangladesh"),
+}
+
+T_PER_YEAR = 365.25 / 7.0  # Exact weeks per year (~52.1786)
+NUM_MODES_YEAR = 3
+
 
 def fit_holiday_model(
     search_term: str,
-    geo="US",
-    start_date: str = None,
-    train_split: int = 80,
+    geo: str = "US",
+    start_date: str | None = None,
+    train_split_percentage: int = 80,
     num_chains: int = 4,
-    max_treedepth=10,
-    adapt_delta=0.8,
-) -> None:
-    assert search_term in [
-        "chocolate",
-        "ramadan",
-    ], f"Search term {search_term} not supported. Only ramadan and chocolate are supported."
-    if search_term == "chocolate":
-        df = pd.read_csv("../bayesian_holidays/src/data/us_chocolate.csv")
-        df = df.rename(columns={"Chocolate": "observed"})
-        country = "UnitedStates"
-    else:
-        df = pd.read_csv("../bayesian_holidays/src/data/bangladesh_ramadan.csv")
-        df = df.rename(columns={"ramadan": "observed"})
-        country = "Bangladesh"
-    df["date"] = pd.to_datetime(df["Week"])
+    max_treedepth: int = 10,
+    adapt_delta: float = 0.8,
+    seed: int = 42,
+    output_dir: str | Path = "./data",
+) -> tuple[pd.DataFrame, CmdStanMCMC]:
+    if search_term not in DATASET_CONFIG:
+        raise ValueError(
+            f"Search term '{search_term}' not supported. "
+            f"Supported terms: {list(DATASET_CONFIG)}"
+        )
 
-    df["observed"] = df["observed"].replace(["<1"], "0").astype(int)
-    if start_date is None:
-        start_date = df["date"].min()
-    else:
-        assert pd.to_datetime(start_date) >= df["date"].min()
-        start_date = pd.to_datetime(start_date)
-    df = df[df["date"] >= pd.to_datetime(start_date)]
-    end_date = df["date"].max()
+    csv_name, target_col, country = DATASET_CONFIG[search_term]
 
-    holiday_years = list(
-        range(pd.to_datetime(start_date).year - 1, pd.to_datetime(end_date).year + 1)
+    # Resolve package paths dynamically instead of hardcoded user paths
+    # Resolve package paths directly inside bayesian_holidays
+    pkg_root = files("bayesian_holidays")
+    csv_resource = pkg_root / "data" / csv_name
+    stan_path = pkg_root / "holiday_model.stan"
+
+    # Load and clean dataset in a single pass
+    with as_file(csv_resource) as csv_path:
+        df = (
+            pd.read_csv(Path(csv_path), usecols=["Time", target_col])
+            .rename(columns={target_col: "observed"})
+            .assign(
+                date=lambda d: pd.to_datetime(d["Time"]),
+                observed=lambda d: pd.to_numeric(
+                    d["observed"].replace("<1", "0"), errors="raise"
+                ).astype(np.int64),
+            )
+            .sort_values("date", ignore_index=True)
+        )
+
+    min_date = df["date"].min()
+    if start_date is not None:
+        parsed_start = pd.to_datetime(start_date)
+        if parsed_start < min_date:
+            raise ValueError(
+                f"start_date ({parsed_start}) precedes dataset min ({min_date})."
+            )
+        df = df[df["date"] >= parsed_start].reset_index(drop=True)
+
+    # Fetch holiday calendar covering one year before start through one year after end
+    start_year = df["date"].min().year - 1
+    end_year = df["date"].max().year + 1
+    holiday_list = get_holiday_dataframe(
+        years=list(range(start_year, end_year + 1)),
+        country=country,
     )
-    holiday_list = (
-        get_holiday_dataframe(years=holiday_years, country=country)
-        .sort_values(by="HolidayDate")
-        .reset_index()
-    )
 
-    train_date = df.date.iloc[int((train_split / 100) * df.date.shape[0])]
+    # Compute d_peak, hol_mask, and Fourier features ONCE on the full timeline, then slice
+    split_idx = int((train_split_percentage / 100.0) * len(df))
+    all_dates = df["date"].to_numpy()
 
-    df_train = df[df.date <= train_date]
-    df_test = df[df.date > train_date]
+    d_peak_all = create_d_peak(all_dates, holiday_list)
+    hol_mask_all = create_mask_logistic(all_dates, holiday_list)
 
-    d_peak = create_d_peak(df_train.date, holiday_list)
-    d_peak_test = create_d_peak(df_test.date, holiday_list)
+    week_of_year = df["date"].dt.isocalendar().week.to_numpy(dtype=np.int64)
 
-    hol_mask = create_mask_logistic(df_train.date, holiday_list)
-    hol_mask_test = create_mask_logistic(df_test.date, holiday_list)
-
-    num_modes_year = 3
-    T_PER_YEAR = 52.1429
-
-    X_year = fourier_design_matrix(
-        array(df_train.date.dt.isocalendar().week.values, dtype=int),
+    X_year_all = fourier_design_matrix(
+        week_of_year,
         period=T_PER_YEAR,
-        num_modes=num_modes_year,
-    )
-
-    X_year_test = fourier_design_matrix(
-        array(df_test.date.dt.isocalendar().week.values, dtype=int),
-        period=T_PER_YEAR,
-        num_modes=num_modes_year,
-    )
-
-    holiday_model = CmdStanModel(
-        stan_file="../bayesian_holidays/src/holiday_model.stan",
+        num_modes=NUM_MODES_YEAR,
     )
 
     stan_data = create_stan_data(
-        df_train.observed,
-        num_modes_year,
-        X_year,
-        X_year_test,
-        d_peak,
-        d_peak_test,
-        hol_mask,
-        hol_mask_test,
+        df["observed"].iloc[:split_idx],
+        NUM_MODES_YEAR,
+        X_year_all[:, :split_idx],
+        X_year_all[:, split_idx:],
+        d_peak_all[:, :split_idx],
+        d_peak_all[:, split_idx:],
+        hol_mask_all[:, :split_idx],
+        hol_mask_all[:, split_idx:],
     )
 
-    holiday_pathfinder = holiday_model.pathfinder(data=stan_data, seed=42)
+    # CmdStanModel automatically caches the compiled binary if the .stan file hasn't changed
+    holiday_model = CmdStanModel(
+        stan_file=str(stan_path),
+        stanc_options={"O1": True},
+        cpp_options={
+            "STAN_CPP_OPTIMS": "true",
+            "STAN_NO_RANGE_CHECKS": "true",
+        },
+    )
+
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    holiday_pathfinder = holiday_model.pathfinder(
+        data=stan_data,
+        num_paths=num_chains,
+        seed=seed,
+    )
+
+    inits = cast(
+        list[Mapping[str, Any]] | Mapping[str, Any],
+        holiday_pathfinder.create_inits(),
+    )
 
     holiday_fit = holiday_model.sample(
-        inits=holiday_pathfinder.create_inits(),
+        inits=inits,
         chains=num_chains,
+        parallel_chains=num_chains,
         iter_warmup=1000,
         iter_sampling=1000,
         data=stan_data,
         max_treedepth=max_treedepth,
         adapt_delta=adapt_delta,
+        seed=seed,
         show_progress=True,
-        output_dir="./data",
+        output_dir=str(output_dir),
     )
+
     return df, holiday_fit

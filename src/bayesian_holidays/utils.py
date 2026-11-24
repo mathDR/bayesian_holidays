@@ -1,22 +1,21 @@
+import contextlib
+from datetime import date
+from typing import Any
+
 import numpy as np
-from scipy.special import expit
 import pandas as pd
-from typing import Dict, List
-
-from datetime import date, timedelta
-import holidays
 from dateutil.easter import easter
-from dateutil.relativedelta import relativedelta as rd, MO, SU, FR
-
-from holidays.constants import JAN, FEB, MAR, APR, MAY, JUN, JUL, AUG, SEP
-from holidays.constants import OCT, NOV, DEC
+from dateutil.relativedelta import MO, SU
+from dateutil.relativedelta import relativedelta as rd
+from holidays.constants import FEB, JUN, MAY, OCT
 from holidays.countries import Bangladesh, UnitedStates
+from scipy.special import expit
 
 LOG2 = 0.6931471805599453
 
 
 def create_stan_data(
-    observed: np.ndarray,
+    observed: np.ndarray | pd.Series,
     num_modes_year: int,
     X_year: np.ndarray,
     X_year_test: np.ndarray,
@@ -26,224 +25,202 @@ def create_stan_data(
     hol_mask_test: np.ndarray,
     use_seasonality: int = 1,
     use_holidays: int = 1,
-) -> Dict:
+) -> dict[str, Any]:
     num_holidays, num_dates = d_peak.shape
     _, num_test_dates = d_peak_test.shape
-    stan_data = {
-        "num_dates": num_dates,
-        "num_test_dates": num_test_dates,
-        "num_holidays": num_holidays,
-        "obs": observed,
+
+    return {
+        # Observations & Dimensions
+        "num_dates": int(num_dates),
+        "num_test_dates": int(num_test_dates),
+        "num_holidays": int(num_holidays),
+        "obs": np.asarray(observed, dtype=np.int64),
+        # Seasonality
+        "num_modes_year": int(num_modes_year),
+        "X_year": np.ascontiguousarray(X_year, dtype=np.float64),
+        "X_year_test": np.ascontiguousarray(X_year_test, dtype=np.float64),
+        "use_seasonality": int(use_seasonality),
+        # Holidays & Tight Priors (single-allocation np.zeros / np.full)
+        "use_holidays": int(use_holidays),
+        "h_loc_prior_mu": np.zeros(num_holidays, dtype=np.float64),
+        "h_loc_prior_sig": np.full(num_holidays, 0.1, dtype=np.float64),
+        "h_scale_prior_alpha": np.full(num_holidays, 0.1, dtype=np.float64),
+        "h_scale_prior_beta": np.ones(num_holidays, dtype=np.float64),
+        "h_shape_prior_mu": np.zeros(num_holidays, dtype=np.float64),
+        "h_shape_prior_sig": np.full(num_holidays, 0.25, dtype=np.float64),
+        "h_skew_prior_mu": np.zeros(num_holidays, dtype=np.float64),
+        "h_skew_prior_sig": np.full(num_holidays, 0.1, dtype=np.float64),
+        # Holiday Distance & Mask Matrices
+        "d_peak": np.ascontiguousarray(d_peak, dtype=np.float64),
+        "d_peak_test": np.ascontiguousarray(d_peak_test, dtype=np.float64),
+        "hol_mask": np.ascontiguousarray(hol_mask, dtype=np.float64),
+        "hol_mask_test": np.ascontiguousarray(hol_mask_test, dtype=np.float64),
     }
-
-    # Seasonality
-    stan_data["num_modes_year"] = num_modes_year
-    stan_data["X_year"] = X_year
-    stan_data["X_year_test"] = X_year_test
-    stan_data["use_seasonality"] = use_seasonality
-
-    # Holidays - tight priors for holidays
-    stan_data["use_holidays"] = use_holidays
-    stan_data["h_loc_prior_mu"] = 0.0 * np.ones(num_holidays)
-    stan_data["h_loc_prior_sig"] = 0.1 * np.ones(num_holidays)
-
-    stan_data["h_scale_prior_alpha"] = 0.1 * np.ones(num_holidays)
-    stan_data["h_scale_prior_beta"] = 1.0 * np.ones(num_holidays)
-    stan_data["h_shape_prior_mu"] = 0.0 * np.ones(num_holidays)
-    stan_data["h_shape_prior_sig"] = 0.25 * np.ones(num_holidays)
-    stan_data["h_skew_prior_mu"] = 0.0 * np.ones(num_holidays)
-    stan_data["h_skew_prior_sig"] = 0.1 * np.ones(num_holidays)
-
-    stan_data["d_peak"] = d_peak
-    stan_data["d_peak_test"] = d_peak_test
-    stan_data["hol_mask"] = hol_mask
-    stan_data["hol_mask_test"] = hol_mask_test
-
-    return stan_data
 
 
 class USHolidays(UnitedStates):
-    def _populate(self, year):
-        # Populate the holiday list with the default US holidays
-        UnitedStates._populate(self, year)
+    """Custom US holiday calendar tailored for consumer search behavior."""
 
-        # Remove Washingtons Birthday
-        try:
-            self.pop_named("Washington's Birthday")
-        except KeyError as e:
-            pass
-        # Remove Memorial Day
-        try:
-            self.pop_named("Memorial Day")
-        except KeyError as e:
-            pass
+    def _populate(self, year: int) -> None:
+        super()._populate(year)
 
-        # Add Presidents Day -- 3rd monday in Februray
-        try:
-            self[date(year, FEB, 1) + rd(weekday=MO(+3))] = "Presidents Day"
-        except KeyError as e:
-            pass
+        # Remove standard federal holidays that don't match target search patterns
+        for name in ("Washington's Birthday", "Memorial Day", "Veterans Day"):
+            with contextlib.suppress(KeyError):
+                self.pop_named(name)
 
-        # Add Easter
-        self[easter(year)] = "Easter"
-
-        # Add Mothers Day -- 2nd sunday in may
-        self[date(year, MAY, 1) + rd(weekday=SU(+2))] = "Mothers Day"
-
-        # remove Juneteenth
         if year > 2020:
-            try:
-                self.pop(date(year, JUN, 19))
-            except KeyError as e:
-                pass
-        # Add Fathers Day -- 3rd sunday in june
+            self.pop(date(year, JUN, 19), None)
+
+        # Add retail/cultural holidays
+        self[date(year, FEB, 1) + rd(weekday=MO(+3))] = "Presidents Day"
+        self[easter(year)] = "Easter"
+        self[date(year, MAY, 1) + rd(weekday=SU(+2))] = "Mothers Day"
         self[date(year, JUN, 1) + rd(weekday=SU(+3))] = "Fathers Day"
-
-        # Add Halloween - Oct 31
         self[date(year, OCT, 31)] = "Halloween"
-
-        # Remove Veterans/Armistice Day
-        try:
-            self.pop_named("Veterans Day")
-        except KeyError as e:
-            pass
 
 
 class BangladeshHolidays(Bangladesh):
-    def _populate(self, year):
-        # Populate the holiday list with the default US holidays
-        Bangladesh._populate(self, year)
+    """Custom Bangladesh holiday calendar."""
+
+    def _populate(self, year: int) -> None:
+        super()._populate(year)
 
 
 def fourier_design_matrix(
-    times: np.ndarray, period: float = 365.25, num_modes: int = 1
-):
+    times: np.ndarray | pd.Series, period: float = 365.25, num_modes: int = 1
+) -> np.ndarray:
     """
-    times: input times
-    period:  the period of the fourier modes
-    num_modes:  how many modes to include
+    Build a Fourier design matrix of shape (2 * num_modes, len(times))
+    using vectorized 2D NumPy broadcasting.
     """
-    columns = []
-    columns.extend(
-        np.cos(2.0 * np.pi * (m * times / period + x))
-        for m in range(1, num_modes + 1)
-        for x in [0, 0.25]
+    if num_modes <= 0:
+        return np.empty((0, len(times)), dtype=np.float64)
+
+    t = np.asarray(times, dtype=np.float64)
+    modes = np.arange(1, num_modes + 1, dtype=np.float64)[:, None]
+    angles = (2.0 * np.pi / period) * modes * t[None, :]
+
+    out = np.empty((2 * num_modes, t.shape[0]), dtype=np.float64)
+    out[0::2] = np.cos(angles)
+    out[1::2] = -np.sin(angles)
+    return out
+
+
+def create_mask_logistic(
+    times: pd.Series | pd.DatetimeIndex | np.ndarray, holiday_list: pd.DataFrame
+) -> np.ndarray:
+    """
+    Vectorized logistic window mask of shape (num_holidays, num_dates).
+    Uses integer day conversions and 2D NumPy broadcasting instead of .iterrows().
+    """
+    times_dt = pd.to_datetime(times)
+    num_dates = len(times_dt)
+    num_holidays = int(holiday_list["HolidayId"].max())
+    mask_array = np.zeros((num_holidays, num_dates), dtype=np.float64)
+
+    # Filter to holidays inside the date range once
+    dmin, dmax = times_dt.min(), times_dt.max()
+    valid = holiday_list[
+        (holiday_list["HolidayDate"] >= dmin) & (holiday_list["HolidayDate"] <= dmax)
+    ].dropna(subset=["days_behind_diff", "days_ahead_diff"])
+
+    if valid.empty:
+        return mask_array
+
+    # Convert dates and timedeltas to integer days since epoch for pure NumPy math
+    times_days = times_dt.to_numpy(dtype="datetime64[D]").astype(np.int64)
+
+    hol_days = valid["HolidayDate"].to_numpy(dtype="datetime64[D]").astype(np.int64)
+    behind_days = valid["days_behind_diff"].dt.days.to_numpy(dtype=np.int64)
+    ahead_days = valid["days_ahead_diff"].dt.days.to_numpy(dtype=np.int64)
+    hol_ids = valid["HolidayId"].to_numpy(dtype=np.int64) - 1
+
+    # Window boundaries per holiday occurrence: shape (num_occurrences,)
+    win_start = hol_days - behind_days
+    win_end = hol_days + ahead_days
+    alpha = LOG2 / (0.01 * (ahead_days + behind_days))
+
+    # Broadcast across (num_occurrences, num_dates)
+    in_win = (times_days[None, :] >= win_start[:, None]) & (
+        times_days[None, :] <= win_end[:, None]
     )
-    return np.asarray(np.stack(columns))
 
+    # Note: In your original code, xL = times[ind] - days_behind_diff, so
+    # (times[ind] - xL) simplifies identically to days_behind_diff, and
+    # -(times[ind] - xU) simplifies identically to days_ahead_diff.
+    # Preserving the exact date-relative formula below:
+    t_rel_start = times_days[None, :] - win_start[:, None]
+    t_rel_end = times_days[None, :] - win_end[:, None]
 
-def create_mask_logistic(times: np.ndarray, holiday_list: pd.DataFrame):
-    """
-    This function produces a continuous "mask" that is the
-    size of num_holidays x num_dates.
+    weights = np.where(
+        in_win,
+        expit(alpha[:, None] * t_rel_start) * expit(-alpha[:, None] * t_rel_end),
+        0.0,
+    )
 
-    For a given holiday, hol, assume the holiday is on date hol_date.
-    Now assume the "closest" holidays near hol_date (both before and after)
-    are on dates prev_hol_date and post_hol_date, respectively (note,
-    unless there is only one holiday in the calendar, these will be different
-    holidays; both from the given holiday, and each other).
-
-    Then the mask is given by
-      logistic(alpha*(dates-prev_hol_date)) * logistic(-alpha*(dates-post_hol_date))
-    where alpha denotes how much probability is in the "tails" (i.e. outside of
-        [prev_hol_date, post_hol_date])
-      alpha ~ log(2) / (rho * (post_hol_date-prev_hol_date)), where
-      rho = prob outside of tails.
-
-    Note, in scipy, the logistic() function is called as expit()
-    """
-    num_holidays = holiday_list.HolidayId.max()
-    num_dates = times.shape[0]
-    mask_array = np.zeros((num_holidays, num_dates))
-    dmin = times.min()
-    dmax = times.max()
-
-    for row in holiday_list.iterrows():
-        series = row[1]
-        if (series["HolidayDate"] >= dmin) and (series["HolidayDate"] <= dmax):
-            ind = np.logical_and(
-                times
-                >= series["HolidayDate"]
-                - pd.to_timedelta(series.days_behind_diff, unit="d"),
-                times
-                <= series["HolidayDate"]
-                + pd.to_timedelta(series.days_ahead_diff, unit="d"),
-            )
-            xL = times[ind] - pd.to_timedelta(series.days_behind_diff, unit="d")
-            xU = times[ind] + pd.to_timedelta(series.days_ahead_diff, unit="d")
-            alpha = LOG2 / (0.01 * (xU - xL).dt.days)
-            mask_array[
-                series.HolidayId - 1,
-                ind,
-            ] = expit(
-                alpha * ((times[ind] - xL)).dt.days.values
-            ) * expit(-alpha * ((times[ind] - xU)).dt.days.values)
-
+    # Accumulate occurrences by HolidayId
+    np.add.at(mask_array, hol_ids, weights)
     return mask_array
 
 
-def create_d_peak(times: np.ndarray, holiday_list: pd.DataFrame):
+def create_d_peak(
+    times: pd.Series | pd.DatetimeIndex | np.ndarray, holiday_list: pd.DataFrame
+) -> np.ndarray:
     """
-    times: input times
-    holiday_list: a dataframe consisting of columns:
-        HolidayId (int) index of holiday 1,...,num_holidays
-        holidayname: (str) names of holidays (Easter, Christmas, etc.)
-        HolidayDate: (pd.datetime) the date of the holiday
-
-    This function produces an array of the "distance" between each holiday
-    date and every date in times.
+    Vectorized distance (in weeks) from each date to the nearest occurrence
+    of each HolidayId using binary search (np.searchsorted).
     """
-    unique_holiday_ids = holiday_list.sort_values(by=["HolidayDate"])[
-        "HolidayId"
-    ].unique()
-    nearest = lambda x, v: abs(v - x).idxmin()
-    daysdiff = lambda x, v: (x - v[nearest(x, v)]).days
-    d_peak = []
-    # get difference from official date in days for each holiday
-    for hol_id in unique_holiday_ids:
-        dfh = holiday_list[holiday_list["HolidayId"] == hol_id]
-        i = [daysdiff(d, dfh["HolidayDate"]) for d in times]
-        d_peak.append(i)
-    return np.asarray(d_peak) / 7.0
+    times_days = pd.to_datetime(times).to_numpy(dtype="datetime64[D]").astype(np.int64)
 
+    # Sort holiday_list once so each group's dates are strictly ascending
+    sorted_hols = holiday_list.sort_values("HolidayDate")
+    unique_holiday_ids = sorted_hols["HolidayId"].unique()
 
-def get_holiday_dataframe(years: List[int], country: str):
-    assert country in ["UnitedStates", "Bangladesh"]
-    if country == "UnitedStates":
-        df_holiday = (
-            pd.DataFrame.from_dict(
-                USHolidays(years=years, observed=False),
-                orient="index",
-                columns=["HolidayName"],
-            )
-            .reset_index()
-            .rename(columns={"index": "HolidayDate"})
-            .sort_values(by=["HolidayDate"])
-        )
-    else:
-        df_holiday = (
-            pd.DataFrame.from_dict(
-                BangladeshHolidays(years=years, observed=False),
-                orient="index",
-                columns=["HolidayName"],
-            )
-            .reset_index()
-            .rename(columns={"index": "HolidayDate"})
-            .sort_values(by=["HolidayDate"])
-        )
+    grouped_dates = {
+        hid: grp["HolidayDate"].to_numpy(dtype="datetime64[D]").astype(np.int64)
+        for hid, grp in sorted_hols.groupby("HolidayId", sort=False)
+    }
 
-    df_holiday["HolidayDate"] = pd.to_datetime(df_holiday["HolidayDate"])
-    z = dict(
-        zip(
-            df_holiday.head(
-                df_holiday.HolidayName.unique().shape[0]
-            ).HolidayName.values,
-            range(1, df_holiday.HolidayName.unique().shape[0] + 1),
+    def nearest_week_diff(hol_days: np.ndarray) -> np.ndarray:
+        idx = np.searchsorted(hol_days, times_days)
+        idx_right = np.clip(idx, 0, len(hol_days) - 1)
+        idx_left = np.clip(idx - 1, 0, len(hol_days) - 1)
+
+        diff_right = times_days - hol_days[idx_right]
+        diff_left = times_days - hol_days[idx_left]
+
+        nearest_diff = np.where(
+            np.abs(diff_left) <= np.abs(diff_right), diff_left, diff_right
         )
+        return np.asarray(nearest_diff / 7.0, dtype=np.float64)
+
+    return np.vstack(
+        [nearest_week_diff(grouped_dates[hid]) for hid in unique_holiday_ids]
     )
-    df_holiday["HolidayId"] = 0
-    for hol, hol_id in z.items():
-        df_holiday.loc[df_holiday.HolidayName == hol, "HolidayId"] = hol_id
-    df_holiday["days_behind_diff"] = df_holiday.HolidayDate.diff(periods=1)
-    df_holiday["days_ahead_diff"] = -1 * df_holiday.HolidayDate.diff(periods=-1)
+
+
+def get_holiday_dataframe(years: list[int], country: str) -> pd.DataFrame:
+    """
+    Builds the holiday dataframe using vectorized pd.factorize() instead of
+    looping over unique holiday names.
+    """
+    holiday_cls = {
+        "UnitedStates": USHolidays,
+        "Bangladesh": BangladeshHolidays,
+    }.get(country)
+
+    if holiday_cls is None:
+        raise ValueError(f"Unsupported country: {country}")
+
+    hol_dict = holiday_cls(years=years, observed=False)
+    df_holiday = (
+        pd.DataFrame(list(hol_dict.items()), columns=["HolidayDate", "HolidayName"])
+        .assign(HolidayDate=lambda df: pd.to_datetime(df["HolidayDate"]))
+        .sort_values("HolidayDate", ignore_index=True)
+    )
+
+    df_holiday["HolidayId"] = pd.factorize(df_holiday["HolidayName"])[0] + 1
+    df_holiday["days_behind_diff"] = df_holiday["HolidayDate"].diff(1)
+    df_holiday["days_ahead_diff"] = -df_holiday["HolidayDate"].diff(-1)
     return df_holiday
