@@ -54,9 +54,21 @@ def fit_holiday_model(
 
     # Load and clean dataset in a single pass
     with as_file(csv_resource) as csv_path:
+        raw_df = pd.read_csv(Path(csv_path))
+        matched_cols = [
+            col
+            for col in raw_df.columns
+            if col.strip().lower().startswith(target_col.lower())
+        ]
+        if not matched_cols:
+            raise ValueError(
+                f"Column starting with '{target_col}' not found in {csv_name}. "
+                f"Available columns: {list(raw_df.columns)}"
+            )
+
         df = (
-            pd.read_csv(Path(csv_path), usecols=["Time", target_col])
-            .rename(columns={target_col: "observed"})
+            raw_df[["Time", matched_cols[0]]]
+            .rename(columns={matched_cols[0]: "observed"})
             .assign(
                 date=lambda d: pd.to_datetime(d["Time"]),
                 observed=lambda d: pd.to_numeric(
@@ -65,6 +77,7 @@ def fit_holiday_model(
             )
             .sort_values("date", ignore_index=True)
         )
+
 
     min_date = df["date"].min()
     if start_date is not None:

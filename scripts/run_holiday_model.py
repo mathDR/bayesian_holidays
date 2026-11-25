@@ -1,6 +1,7 @@
 """Run end-to-end Bayesian holiday model fitting, diagnostics, and plotting."""
 
 import argparse
+
 import cmdstanpy
 from cmdstanpy.utils import cmdstan_path
 
