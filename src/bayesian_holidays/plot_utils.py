@@ -458,8 +458,14 @@ def plot_decomposition(
     all_dates = df["date"]
 
     # Extract and concatenate train + test posterior draws along time axis
-    baseline_draws = df_fit.stan_variable("log_baseline_real")[:, None]
-    baseline_full = np.repeat(np.exp(baseline_draws), len(df), axis=1)
+    base_train = df_fit.stan_variable("log_baseline")
+    if has_test:
+        baseline_full = np.exp(
+            np.concatenate([base_train, df_fit.stan_variable("test_log_baseline")], axis=1)
+        )
+    else:
+        baseline_full = np.exp(base_train)
+
 
     seas_train = df_fit.stan_variable("log_seasonality")
     hol_train = df_fit.stan_variable("holiday_effect")

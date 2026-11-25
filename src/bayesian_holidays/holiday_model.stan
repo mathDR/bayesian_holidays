@@ -88,6 +88,7 @@ data {
   // FEATURE TOGGLES
   int<lower=0, upper=1> use_seasonality;
   int<lower=0, upper=1> use_holidays;
+  int<lower=0, upper=1> use_ar1;
 
   matrix[num_holidays, num_dates] d_peak;
   matrix[num_holidays, num_test_dates] d_peak_test;
@@ -132,22 +133,28 @@ transformed data {
   if (total_runs_test > 0) {
     mask_runs_test = get_mask_runs(hol_mask_test, total_runs_test);
   }
-
 }
 
 parameters {
   real log_baseline_real;
   row_vector[2 * num_modes_year] fourier_coefficients;
-  
+  real<lower=0.01, upper=10.0> inv_sqrt_phi;
+
+  // Non-centered AR(1) growth increments anchored at ar_trend[1] = 0 (funnel-free!)
+  real<lower=0, upper=0.995> ar_phi;
+  real<lower=0> ar_sigma;
+  row_vector[num_dates - 1] ar_z;
+
   // Regularized Horseshoe (positive Half-Normal * Inv-Gamma -> strictly unimodal)
   vector[num_holidays] lambda_tilde;
   vector<lower=0>[num_holidays] lambda_m_z;
-  vector<lower=0>[num_holidays] lambda_m_ig;
+  vector<lower=0, upper=1e12>[num_holidays] lambda_m_ig;
+  real<lower=0, upper=1e12> tau_ig;
+
   real<lower=0> tau_z;
-  real<lower=0> tau_ig;
   real<lower=0> c2_tilde;
 
-  // Fully non-centered normal parameterization for all holiday shape parameters
+  // Fully non-centered normal parameterization for holiday shape parameters
   vector[num_holidays] h_locZ;
   vector[num_holidays] h_scaleZ;
   vector[num_holidays] h_shapeZ;
@@ -155,11 +162,21 @@ parameters {
 }
 
 transformed parameters {
+  row_vector[num_dates] ar_trend = rep_row_vector(0.0, num_dates);
+  if (use_ar1) {
+    for (t in 2:num_dates) {
+      ar_trend[t] = ar_phi * ar_trend[t - 1] + ar_sigma * ar_z[t - 1];
+    }
+  }
+
+  row_vector[num_dates] log_baseline = log_baseline_real + ar_trend;
+
   real<lower=0> tau2 = square(tau0 * tau_z) * tau_ig;
   real<lower=0> tau = sqrt(tau2);
   real<lower=0> c2 = slab_scale2 * c2_tilde;
 
-  // Overflow-safe regularized horseshoe scale
+  real<lower=0> phi = inv_square(inv_sqrt_phi);
+
   vector<lower=0>[num_holidays] inv_lambda_m2 = inv_square(lambda_m_z) ./ lambda_m_ig;
   vector<lower=0>[num_holidays] lambda_tilde_m = inv_sqrt(inv_lambda_m2 + tau2 / c2);
 
@@ -167,9 +184,7 @@ transformed parameters {
   vector[num_holidays] h_loc = h_loc_prior_mu + h_loc_prior_sig .* h_locZ;
   vector<lower=0>[num_holidays] h_shape = exp(h_shape_prior_mu + h_shape_prior_sig .* h_shapeZ);
   vector[num_holidays] h_skew = h_skew_prior_mu + h_skew_prior_sig .* h_skewZ;
-  // Prior median ~0.74 weeks (~5 days), 95% mass in [0.34, 1.6] weeks
   vector<lower=0>[num_holidays] h_scale = exp(-0.3 + 0.4 * h_scaleZ);
-
 
   row_vector[num_dates] log_seasonality = use_seasonality
     ? (fourier_coefficients * X_year)
@@ -182,15 +197,19 @@ transformed parameters {
       : rep_row_vector(0.0, num_dates);
   }
 
-  row_vector[num_dates] log_obs_mean = log_baseline_real + holiday_effect + log_seasonality;
+  row_vector[num_dates] log_obs_mean = log_baseline + holiday_effect + log_seasonality;
 }
 
 model {
   profile("priors") {
     fourier_coefficients ~ std_normal();
-    log_baseline_real ~ std_normal();
+    log_baseline_real ~ normal(3.5, 1.5);
+
+    // Non-centered AR(1) priors (completely immune to ar_sigma -> 0 funnel)
+    ar_phi ~ beta(18, 2);
+    ar_sigma ~ normal(0, 0.03);
+    ar_z ~ std_normal();
     
-    // Half-Normal * Inv-Gamma Half-Cauchy priors (no sign reflection modes)
     lambda_tilde ~ std_normal();
     lambda_m_z ~ std_normal();
     lambda_m_ig ~ inv_gamma(0.5, 0.5);
@@ -198,19 +217,29 @@ model {
     tau_ig ~ inv_gamma(0.5, 0.5);
     c2_tilde ~ inv_gamma(half_slab_df, half_slab_df);
 
-    // Pure isotropic standard normals for non-centered holiday parameters
     h_locZ ~ std_normal();
     h_scaleZ ~ std_normal();
     h_shapeZ ~ std_normal();
     h_skewZ ~ std_normal();
   }
     
-  target += poisson_log_lupmf(obs | log_obs_mean);
+  /*target += poisson_log_lupmf(obs | log_obs_mean);*/
+  inv_sqrt_phi ~ std_normal();
+  target += neg_binomial_2_log_lupmf(obs | log_obs_mean, phi);
+
 }
 
 
 generated quantities {
-  row_vector[num_test_dates] test_log_baseline = rep_row_vector(log_baseline_real, num_test_dates);
+  row_vector[num_test_dates] test_ar_trend = rep_row_vector(0.0, num_test_dates);
+  if (use_ar1 && num_test_dates > 0) {
+    test_ar_trend[1] = normal_rng(ar_phi * ar_trend[num_dates], ar_sigma);
+    for (t in 2:num_test_dates) {
+      test_ar_trend[t] = normal_rng(ar_phi * test_ar_trend[t - 1], ar_sigma);
+    }
+  }
+
+  row_vector[num_test_dates] test_log_baseline = log_baseline_real + test_ar_trend;
   row_vector[num_test_dates] test_log_seasonality = use_seasonality
     ? (fourier_coefficients * X_year_test)
     : rep_row_vector(0.0, num_test_dates);
@@ -220,6 +249,7 @@ generated quantities {
     : rep_row_vector(0.0, num_test_dates);
 
   row_vector[num_test_dates] test_log_obsmean = test_log_baseline + test_holiday_effect + test_log_seasonality;
-  array[num_test_dates] int test_obs = poisson_log_rng(fmin(test_log_obsmean, 20.0));
-}
+  /*array[num_test_dates] int test_obs = poisson_log_rng(fmin(test_log_obsmean, 20.0));*/
+  array[num_test_dates] int test_obs = neg_binomial_2_log_rng(fmin(test_log_obsmean, 15.0), phi);
 
+}

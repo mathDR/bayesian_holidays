@@ -25,6 +25,7 @@ def create_stan_data(
     hol_mask_test: np.ndarray,
     use_seasonality: int = 1,
     use_holidays: int = 1,
+    use_ar1: int = 1,
 ) -> dict[str, Any]:
     num_holidays, num_dates = d_peak.shape
     _, num_test_dates = d_peak_test.shape
@@ -55,6 +56,8 @@ def create_stan_data(
         "d_peak_test": np.ascontiguousarray(d_peak_test, dtype=np.float64),
         "hol_mask": np.ascontiguousarray(hol_mask, dtype=np.float64),
         "hol_mask_test": np.ascontiguousarray(hol_mask_test, dtype=np.float64),
+        "use_ar1": int(use_ar1),
+
     }
 
 
