@@ -139,29 +139,37 @@ parameters {
   real log_baseline_real;
   row_vector[2 * num_modes_year] fourier_coefficients;
   
+  // Regularized Horseshoe (positive Half-Normal * Inv-Gamma -> strictly unimodal)
   vector[num_holidays] lambda_tilde;
+  vector<lower=0>[num_holidays] lambda_m_z;
+  vector<lower=0>[num_holidays] lambda_m_ig;
+  real<lower=0> tau_z;
+  real<lower=0> tau_ig;
   real<lower=0> c2_tilde;
-  real<lower=0, upper=pi() / 2> tau_tilde_unif;
+
+  // Fully non-centered normal parameterization for all holiday shape parameters
   vector[num_holidays] h_locZ;
-  vector<lower=0>[num_holidays] h_scale_raw;
+  vector[num_holidays] h_scaleZ;
   vector[num_holidays] h_shapeZ;
   vector[num_holidays] h_skewZ;
-  vector<lower=0, upper=pi() / 2>[num_holidays] lambda_m_unif;
 }
 
 transformed parameters {
-  vector<lower=0>[num_holidays] lambda_m = tan(lambda_m_unif);
-  real<lower=0> tau_tilde = tan(tau_tilde_unif);
-  real<lower=0> tau = tau0 * tau_tilde;
+  real<lower=0> tau2 = square(tau0 * tau_z) * tau_ig;
+  real<lower=0> tau = sqrt(tau2);
   real<lower=0> c2 = slab_scale2 * c2_tilde;
-  vector<lower=0>[num_holidays] lambda_tilde_m = 
-    sqrt(c2 * square(lambda_m) ./ (c2 + square(tau) * square(lambda_m)));
+
+  // Overflow-safe regularized horseshoe scale
+  vector<lower=0>[num_holidays] inv_lambda_m2 = inv_square(lambda_m_z) ./ lambda_m_ig;
+  vector<lower=0>[num_holidays] lambda_tilde_m = inv_sqrt(inv_lambda_m2 + tau2 / c2);
 
   vector[num_holidays] intensity = tau * lambda_tilde_m .* lambda_tilde;
   vector[num_holidays] h_loc = h_loc_prior_mu + h_loc_prior_sig .* h_locZ;
   vector<lower=0>[num_holidays] h_shape = exp(h_shape_prior_mu + h_shape_prior_sig .* h_shapeZ);
   vector[num_holidays] h_skew = h_skew_prior_mu + h_skew_prior_sig .* h_skewZ;
-  vector<lower=0>[num_holidays] h_scale = h_scale_raw ./ h_scale_prior_beta; 
+  // Prior median ~0.74 weeks (~5 days), 95% mass in [0.34, 1.6] weeks
+  vector<lower=0>[num_holidays] h_scale = exp(-0.3 + 0.4 * h_scaleZ);
+
 
   row_vector[num_dates] log_seasonality = use_seasonality
     ? (fourier_coefficients * X_year)
@@ -182,16 +190,24 @@ model {
     fourier_coefficients ~ std_normal();
     log_baseline_real ~ std_normal();
     
+    // Half-Normal * Inv-Gamma Half-Cauchy priors (no sign reflection modes)
     lambda_tilde ~ std_normal();
+    lambda_m_z ~ std_normal();
+    lambda_m_ig ~ inv_gamma(0.5, 0.5);
+    tau_z ~ std_normal();
+    tau_ig ~ inv_gamma(0.5, 0.5);
     c2_tilde ~ inv_gamma(half_slab_df, half_slab_df);
+
+    // Pure isotropic standard normals for non-centered holiday parameters
     h_locZ ~ std_normal();
-    h_scale_raw ~ gamma(h_scale_prior_alpha, 1.0);
+    h_scaleZ ~ std_normal();
     h_shapeZ ~ std_normal();
     h_skewZ ~ std_normal();
   }
     
   target += poisson_log_lupmf(obs | log_obs_mean);
 }
+
 
 generated quantities {
   row_vector[num_test_dates] test_log_baseline = rep_row_vector(log_baseline_real, num_test_dates);
@@ -204,5 +220,6 @@ generated quantities {
     : rep_row_vector(0.0, num_test_dates);
 
   row_vector[num_test_dates] test_log_obsmean = test_log_baseline + test_holiday_effect + test_log_seasonality;
-  array[num_test_dates] int test_obs = poisson_log_rng(test_log_obsmean);
+  array[num_test_dates] int test_obs = poisson_log_rng(fmin(test_log_obsmean, 20.0));
 }
+

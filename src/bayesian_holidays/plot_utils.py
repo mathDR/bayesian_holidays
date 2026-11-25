@@ -49,7 +49,7 @@ def plot_posteriors(
     """
     df_train, df_test = _get_train_test_split(df, train_split_percentage)
 
-    fig, ax = plt.subplots(figsize=(18, 10))
+    fig, ax = plt.subplots(figsize=(12, 8))
 
     if plot_train:
         mu_train = np.exp(df_fit.stan_variable("log_obs_mean"))
@@ -126,7 +126,7 @@ def plot_components(
     """
     df_train, df_test = _get_train_test_split(df, train_split_percentage)
 
-    fig, ax = plt.subplots(figsize=(18, 10))
+    fig, ax = plt.subplots(figsize=(12, 8))
 
     if plot_train:
         seas_train = np.exp(df_fit.stan_variable("log_seasonality"))
@@ -518,7 +518,7 @@ def plot_decomposition(
     fig, axes = plt.subplots(
         nrows=4,
         ncols=1,
-        figsize=(16, 13),
+        figsize=(12, 8),
         sharex=True,
         gridspec_kw={"height_ratios": [1.5, 0.8, 1.0, 1.0]},
     )

@@ -113,28 +113,13 @@ def fit_holiday_model(
     holiday_model = CmdStanModel(
         stan_file=str(stan_path),
         stanc_options={"O1": True},
-        cpp_options={
-            "STAN_CPP_OPTIMS": "true",
-            "STAN_NO_RANGE_CHECKS": "true",
-        },
     )
 
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    holiday_pathfinder = holiday_model.pathfinder(
-        data=stan_data,
-        num_paths=num_chains,
-        seed=seed,
-    )
-
-    inits = cast(
-        list[Mapping[str, Any]] | Mapping[str, Any],
-        holiday_pathfinder.create_inits(),
-    )
-
     holiday_fit = holiday_model.sample(
-        inits=inits,
+        inits=0.5,
         chains=num_chains,
         parallel_chains=num_chains,
         iter_warmup=1000,
